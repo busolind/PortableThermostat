@@ -9,7 +9,6 @@ Vorrei dunque realizzare un sistema composto da un'unità fissa, posizionata dov
 Non è da escludere la possibilità che ci sia più di un'unità portatile, per fare in modo che due o più stanze non comunicanti possano essere contemporaneamente usate come punti di riferimento per avere un riscaldamento più omogeneo.
 # Materiali
 Per l'unità fissa è sufficiente un microcontrollore con funzionalità di rete e un relé per attivare e disattivare la pompa dei termosifoni.
-Ciascuna delle unità portatili avrà un altro microcontrollore, un termometro, un display per visualizzare la temperatura attuale e/o quella impostata come target, un alloggiamento
-per le batterie al fine da garantire una maggiore libertà di posizionamento e tre pulsanti: due per incremento/decremento della temperatura target e uno per inserire/disinserire il sistema.
+Ciascuna delle unità portatili avrà un altro microcontrollore, un termometro, un display per visualizzare la temperatura attuale e/o quella impostata come target, un alloggiamento per le batterie al fine da garantire una maggiore libertà di posizionamento e tre pulsanti: due per incremento/decremento della temperatura target e uno per inserire/disinserire il sistema.
 Tutte le unità saranno connesse alla rete WiFi di casa e comunicheranno tramite MQTT.
 Per la gestione della temperatura verrà implementato un controllo PID.
