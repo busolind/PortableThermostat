@@ -5,15 +5,25 @@ const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
 const char *mqtt_server = "192.168.1.100";
 
+const char *cmdtopic = "PortableThermostat/cmd/mobile";
+
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
 unsigned long lastMsg = 0;
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
+
+#define TOPIC_BUFFER_SIZE (150)
+char topic_buffer[TOPIC_BUFFER_SIZE];
+
 int value = 0;
 
-void setup_wifi() {
+#define RELAY_PIN D5
+#define NUMBER_OF_MOBILES (1)
+byte mobiles[NUMBER_OF_MOBILES];
 
+void setup_wifi() {
+    digitalWrite(BUILTIN_LED, LOW);
     delay(10);
     // We start by connecting to a WiFi network
     Serial.println();
@@ -34,6 +44,7 @@ void setup_wifi() {
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+    digitalWrite(BUILTIN_LED, HIGH);
 }
 
 void mqtt_callback(char *topic, byte *payload, unsigned int length) {
@@ -44,18 +55,21 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
         Serial.print((char)payload[i]);
     }
     Serial.println();
-
+    digitalWrite(BUILTIN_LED, LOW);
     // Switch on the LED if an 1 was received as first character
     if ((char)payload[0] == '1') {
-        digitalWrite(BUILTIN_LED, LOW); // Turn the LED on (Note that LOW is the voltage level
+        digitalWrite(RELAY_PIN, HIGH); // Turn the LED on (Note that LOW is the voltage level
                                         // but actually the LED is on; this is because
                                         // it is active low on the ESP-01)
     } else {
-        digitalWrite(BUILTIN_LED, HIGH); // Turn the LED off by making the voltage HIGH
+        digitalWrite(RELAY_PIN, LOW); // Turn the LED off by making the voltage HIGH
     }
+    delay(50);
+    digitalWrite(BUILTIN_LED, HIGH);
 }
 
 void mqtt_reconnect() {
+    digitalWrite(BUILTIN_LED, LOW);
     // Loop until we're reconnected
     while (!mqtt_client.connected()) {
         Serial.print("Attempting MQTT connection...");
@@ -66,9 +80,10 @@ void mqtt_reconnect() {
         if (mqtt_client.connect(clientId.c_str())) {
             Serial.println("connected");
             // Once connected, publish an announcement...
-            mqtt_client.publish("PortableThermostat/static/hello", "hello world");
+            mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
             // ... and resubscribe
-            mqtt_client.subscribe("PortableThermostat/mobile");
+            snprintf(topic_buffer, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic, 1);
+            mqtt_client.subscribe(topic_buffer);
         } else {
             Serial.print("failed, rc=");
             Serial.print(mqtt_client.state());
@@ -77,14 +92,19 @@ void mqtt_reconnect() {
             delay(5000);
         }
     }
+    digitalWrite(BUILTIN_LED, HIGH);
 }
 
 void setup() {
     Serial.begin(115200);
     pinMode(BUILTIN_LED, OUTPUT);
+    digitalWrite(BUILTIN_LED, HIGH);
+    pinMode(RELAY_PIN, OUTPUT);
     setup_wifi();
     mqtt_client.setServer(mqtt_server, 1883);
     mqtt_client.setCallback(mqtt_callback);
+
+    
 }
 
 void loop() {
@@ -100,6 +120,16 @@ void loop() {
         snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
         Serial.print("Publish message: ");
         Serial.println(msg);
-        mqtt_client.publish("PortableThermostat/static/hello", msg);
+        mqtt_client.publish("PortableThermostat/info/static/hello", msg);
     }
+  
+
+
+
+
+
+
+
+
+    
 }
