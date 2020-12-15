@@ -153,7 +153,6 @@ void loop() {
                 break;
             }
         }
-        Serial.println();
         if(turnOn == true){
             digitalWrite(RELAY_PIN, HIGH);
             currentlyOn = 1;
