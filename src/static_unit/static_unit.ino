@@ -68,6 +68,17 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     digitalWrite(BUILTIN_LED, HIGH);
 }
 
+//Sottoscrive iterativamente ai topic relativi a ciascun termostato mobile in base al numero specificato in mobilecount
+void mqtt_subscribe_to_mobiles(PubSubClient client, int mobilecount, const char* cmdtopic){
+    for(int i=0; i<NUMBER_OF_MOBILES; i++){
+        snprintf(topic_buffer, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic, i);
+        Serial.print("Subscribed to topic [");
+        Serial.print(topic_buffer);
+        Serial.println("]");
+        mqtt_client.subscribe(topic_buffer);
+    }
+}
+
 void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, LOW);
     // Loop until we're reconnected
@@ -82,8 +93,7 @@ void mqtt_reconnect() {
             // Once connected, publish an announcement...
             mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
             // ... and resubscribe
-            snprintf(topic_buffer, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic, 1);
-            mqtt_client.subscribe(topic_buffer);
+            mqtt_subscribe_to_mobiles(mqtt_client, NUMBER_OF_MOBILES, cmdtopic);
         } else {
             Serial.print("failed, rc=");
             Serial.print(mqtt_client.state());
