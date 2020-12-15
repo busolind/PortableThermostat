@@ -6,10 +6,12 @@ const char *password = "IOT_TEST";
 const char *mqtt_server = "192.168.1.100";
 
 const char *cmdtopic = "PortableThermostat/cmd/mobile";
+const char *infotopic = "PortableThermostat/info/static/isOn";
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
 unsigned long lastMsg = 0;
+unsigned long lastCheck = 0;
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
 
@@ -18,8 +20,10 @@ char topic_buffer[TOPIC_BUFFER_SIZE];
 
 int value = 0;
 
+short currentlyOn = -1;
+
 #define RELAY_PIN D5
-#define NUMBER_OF_MOBILES (1)
+#define NUMBER_OF_MOBILES (5)
 short mobiles[NUMBER_OF_MOBILES]; //Memorizza lo stato dei termostati: -1 se unknown, 0 se non richiedono riscaldamento, 1 se lo richiedono
 
 void setup_wifi() {
@@ -55,14 +59,12 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
         Serial.print((char)payload[i]);
     }
     Serial.println();
+    
     digitalWrite(BUILTIN_LED, LOW);
-    // Switch on the LED if an 1 was received as first character
-    if ((char)payload[0] == '1') {
-        digitalWrite(RELAY_PIN, HIGH); // Turn the LED on (Note that LOW is the voltage level
-                                        // but actually the LED is on; this is because
-                                        // it is active low on the ESP-01)
-    } else {
-        digitalWrite(RELAY_PIN, LOW); // Turn the LED off by making the voltage HIGH
+    byte index = topic[(strlen(cmdtopic) +1)] - '0'; //Estrae il numero del termostato mobile dal percorso del topic
+
+    if(index < NUMBER_OF_MOBILES){ //Non dovrebbe essere necessario perché non sottoscrive nessun topic diverso da quelli con numeri compatibili
+        mobiles[index] = (payload[0] - '0');
     }
     delay(50);
     digitalWrite(BUILTIN_LED, HIGH);
@@ -118,11 +120,12 @@ void setup() {
     pinMode(BUILTIN_LED, OUTPUT);
     digitalWrite(BUILTIN_LED, HIGH);
     pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, LOW);
+    currentlyOn = 0;
     setup_wifi();
     mqtt_client.setServer(mqtt_server, 1883);
     mqtt_client.setCallback(mqtt_callback);
     init_mobile_arr(mobiles, NUMBER_OF_MOBILES);
-    
 }
 
 void loop() {
@@ -130,7 +133,7 @@ void loop() {
         mqtt_reconnect();
     }
     mqtt_client.loop();
-
+    
     unsigned long now = millis();
     if (now - lastMsg > 20000) {
         lastMsg = now;
@@ -140,8 +143,28 @@ void loop() {
         Serial.println(msg);
         mqtt_client.publish("PortableThermostat/info/static/hello", msg);
     }
-    
-  
+
+    if(now - lastCheck > 2000){
+        lastCheck=now;
+        bool turnOn = false;
+        for(int i=0; i < NUMBER_OF_MOBILES; i++){
+            if(mobiles[i] == 1){
+                turnOn = true;
+                break;
+            }
+        }
+        Serial.println();
+        if(turnOn == true){
+            digitalWrite(RELAY_PIN, HIGH);
+            currentlyOn = 1;
+        } else {
+            digitalWrite(RELAY_PIN, LOW);
+            currentlyOn = 0;
+        }
+        char buf[10];
+        mqtt_client.publish(infotopic, itoa(currentlyOn, buf, 10));
+    }
+
 
 
 
