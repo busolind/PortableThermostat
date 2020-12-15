@@ -20,7 +20,7 @@ int value = 0;
 
 #define RELAY_PIN D5
 #define NUMBER_OF_MOBILES (1)
-byte mobiles[NUMBER_OF_MOBILES];
+short mobiles[NUMBER_OF_MOBILES]; //Memorizza lo stato dei termostati: -1 se unknown, 0 se non richiedono riscaldamento, 1 se lo richiedono
 
 void setup_wifi() {
     digitalWrite(BUILTIN_LED, LOW);
@@ -105,6 +105,14 @@ void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, HIGH);
 }
 
+//Inizializza l'array dei mobiles a -1
+void init_mobile_arr(short mobilearr[], int mobilecount){
+    for(int i=0; i<mobilecount; i++){
+        mobilearr[i]=-1;
+    }
+}
+
+
 void setup() {
     Serial.begin(115200);
     pinMode(BUILTIN_LED, OUTPUT);
@@ -113,7 +121,7 @@ void setup() {
     setup_wifi();
     mqtt_client.setServer(mqtt_server, 1883);
     mqtt_client.setCallback(mqtt_callback);
-
+    init_mobile_arr(mobiles, NUMBER_OF_MOBILES);
     
 }
 
@@ -132,6 +140,7 @@ void loop() {
         Serial.println(msg);
         mqtt_client.publish("PortableThermostat/info/static/hello", msg);
     }
+    
   
 
 
