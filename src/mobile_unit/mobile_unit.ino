@@ -24,6 +24,9 @@ int value = 0;
 #define SDA D2
 #define SCL D1
 SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLEDDISPLAY_GEOMETRY  -  Extra param required for 128x32 displays.
+#define TEMP_POS 0,0
+#define HUMID_POS 0,15
+#define TRGT_POS 64,0
 
 #define DHTPIN D5
 #define DHTTYPE    DHT11
@@ -106,6 +109,34 @@ void mqtt_reconnect() {
     }
 }
 
+void handle_temp(){
+    sensors_event_t event;
+    // Get temperature event and print its value.
+    dht.temperature().getEvent(&event);
+    if (isnan(event.temperature)) {
+        Serial.println(F("Error reading temperature!"));
+        display.drawString(TEMP_POS, "T:E");
+    }
+    else {
+        Serial.print(F("Temperature: "));
+        Serial.print(event.temperature);
+        Serial.println(F("°C"));
+        display.drawString(TEMP_POS, "T: " + String(event.temperature) + "°C");
+    }
+    // Get humidity event and print its value.
+    dht.humidity().getEvent(&event);
+    if (isnan(event.relative_humidity)) {
+        Serial.println(F("Error reading humidity!"));
+        display.drawString(HUMID_POS, "H:E");
+    }
+    else {
+        Serial.print(F("Humidity: "));
+        Serial.print(event.relative_humidity);
+        Serial.println(F("%"));
+        display.drawString(HUMID_POS, "H: " + String(event.relative_humidity) + "%");
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     pinMode(BUILTIN_LED, OUTPUT);
@@ -121,12 +152,12 @@ void setup() {
     dht.begin();
     sensor_t sensor;
   
-  // Set delay
-  delayMS = 50;
-
-  display.init();
-  //display.flipScreenVertically();
-  display.setFont(ArialMT_Plain_10);
+    // Set delay
+    delayMS = 50;
+  
+    display.init();
+    //display.flipScreenVertically();
+    display.setFont(ArialMT_Plain_10);
 }
 
 void loop() {
@@ -147,32 +178,8 @@ void loop() {
     }
 
     display.clear();
-
-    // Get temperature event and print its value.
-    sensors_event_t event;
-    dht.temperature().getEvent(&event);
-    if (isnan(event.temperature)) {
-        Serial.println(F("Error reading temperature!"));
-        display.drawString(0, 0, "T:E");
-    }
-    else {
-        Serial.print(F("Temperature: "));
-        Serial.print(event.temperature);
-        Serial.println(F("°C"));
-        display.drawString(0, 0, "T: " + String(event.temperature) + "°C");
-    }
-    // Get humidity event and print its value.
-    dht.humidity().getEvent(&event);
-    if (isnan(event.relative_humidity)) {
-        Serial.println(F("Error reading humidity!"));
-        display.drawString(0, 15, "H:E");
-    }
-    else {
-        Serial.print(F("Humidity: "));
-        Serial.print(event.relative_humidity);
-        Serial.println(F("%"));
-        display.drawString(0, 15, "H: " + String(event.relative_humidity) + "%");
-    }
+    
+    handle_temp();
   
   
     //Senza debounce (c'è giusto il delay, per i test funziona)
@@ -181,7 +188,7 @@ void loop() {
         targetTemp++;
     }
     lastPlusRead=currentPlusRead;
-    display.drawString(64, 0, "TRGET:" + String(targetTemp) + "°C");
+    display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
     
     display.display();
 }
