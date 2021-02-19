@@ -7,6 +7,8 @@
 
 #include <SSD1306Wire.h>
 
+#define MOBILE_ID 0
+
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
 const char *mqtt_server = "192.168.178.100";
@@ -19,15 +21,13 @@ char msg[MSG_BUFFER_SIZE];
 int value = 0;
 
 unsigned long lastCmd = 0;
-const char *cmdtopic_base = "PortableThermostat/cmd/mobile";
-const char *infotopic_base = "PortableThermostat/info/mobile";
-#define TOPIC_BUFFER_SIZE (150)
-char turnOn_topic[TOPIC_BUFFER_SIZE];
-char hello_topic[TOPIC_BUFFER_SIZE];
-
-
-#define MOBILE_ID 0
-
+String cmdtopic_base = "PortableThermostat/cmd/mobile";
+String infotopic_base = "PortableThermostat/info/mobile";
+//#define TOPIC_BUFFER_SIZE (150)
+const char *turnOn_topic;
+const char *hello_topic;
+String turnOn_string = cmdtopic_base + "/" + String(MOBILE_ID) + "/turnOn";
+String hello_string = infotopic_base + "/" + String(MOBILE_ID) + "/hello";
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -150,15 +150,6 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
         Serial.print((char)payload[i]);
     }
     Serial.println();
-
-    // Switch on the LED if an 1 was received as first character
-    if ((char)payload[0] == '1') {
-        digitalWrite(BUILTIN_LED, LOW); // Turn the LED on (Note that LOW is the voltage level
-                                        // but actually the LED is on; this is because
-                                        // it is active low on the ESP-01)
-    } else {
-        digitalWrite(BUILTIN_LED, HIGH); // Turn the LED off by making the voltage HIGH
-    }
 }
 
 void mqtt_reconnect() {
@@ -252,8 +243,10 @@ void setup() {
     //display.flipScreenVertically();
     display.setFont(ArialMT_Plain_10);
 
-    snprintf(turnOn_topic, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic_base, MOBILE_ID);
-    snprintf(hello_topic, TOPIC_BUFFER_SIZE, "%s/%d/hello", infotopic_base, MOBILE_ID);
+    
+    turnOn_topic = turnOn_string.c_str();
+    hello_topic = hello_string.c_str();
+    
 }
 
 void loop() {
