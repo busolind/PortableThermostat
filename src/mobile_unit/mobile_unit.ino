@@ -184,7 +184,7 @@ void mqtt_reconnect() {
 }
 
 void publish_turnOn(){
-    
+    lastCmd = millis();
     char cmd[5];
     itoa(turnOn, cmd, 10);
     Serial.print("Publish message: ");
@@ -287,7 +287,6 @@ void loop() {
     }
 
     if (last_turnOn != turnOn || now - lastCmd > 10000) {
-        lastCmd = now;
         publish_turnOn();
     }
     last_turnOn = turnOn;
