@@ -18,6 +18,16 @@ unsigned long lastMsg = 0;
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
 
+unsigned long lastCmd = 0;
+const char *cmdtopic_base = "PortableThermostat/cmd/mobile";
+const char *infotopic_base = "PortableThermostat/info/mobile";
+#define TOPIC_BUFFER_SIZE (150)
+char turnOn_topic[TOPIC_BUFFER_SIZE];
+char hello_topic[TOPIC_BUFFER_SIZE];
+
+
+#define MOBILE_ID 0
+
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -45,6 +55,7 @@ int currentPlusRead;
 int targetTemp=18;
 int currentTemp;
 int turnOn;
+int last_turnOn = 0;
 
 typedef struct {
     int number;
@@ -161,9 +172,7 @@ void mqtt_reconnect() {
         if (mqtt_client.connect(clientId.c_str())) {
             Serial.println("connected");
             // Once connected, publish an announcement...
-            mqtt_client.publish("PortableThermostat/static/hello", "hello world");
-            // ... and resubscribe
-            mqtt_client.subscribe("PortableThermostat/mobile");
+            mqtt_client.publish(hello_topic, "hello world");
         } else {
             Serial.print("failed, rc=");
             Serial.print(mqtt_client.state());
@@ -172,6 +181,15 @@ void mqtt_reconnect() {
             delay(5000);
         }
     }
+}
+
+void publish_turnOn(){
+    
+    char cmd[5];
+    itoa(turnOn, cmd, 10);
+    Serial.print("Publish message: ");
+    Serial.println(cmd);
+    mqtt_client.publish(turnOn_topic, cmd);
 }
 
 void handle_temp(){
@@ -233,6 +251,9 @@ void setup() {
     display.init();
     //display.flipScreenVertically();
     display.setFont(ArialMT_Plain_10);
+
+    snprintf(turnOn_topic, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic_base, MOBILE_ID);
+    snprintf(hello_topic, TOPIC_BUFFER_SIZE, "%s/%d/hello", infotopic_base, MOBILE_ID);
 }
 
 void loop() {
@@ -249,7 +270,7 @@ void loop() {
         snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
         Serial.print("Publish message: ");
         Serial.println(msg);
-        mqtt_client.publish("PortableThermostat/mobile/hello", msg);
+        mqtt_client.publish(hello_topic, msg);
     }
 
     display.clear();
@@ -264,6 +285,12 @@ void loop() {
     } else {
         turnOn = 0;
     }
+
+    if (last_turnOn != turnOn || now - lastCmd > 10000) {
+        lastCmd = now;
+        publish_turnOn();
+    }
+    last_turnOn = turnOn;
 
     String str;
     if(turnOn == 0)
