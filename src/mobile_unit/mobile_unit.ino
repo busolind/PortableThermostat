@@ -23,14 +23,11 @@ int value = 0;
 unsigned long lastCmd = 0;
 String cmdtopic_base = "PortableThermostat/cmd/mobile";
 String infotopic_base = "PortableThermostat/info/mobile";
-//#define TOPIC_BUFFER_SIZE (150)
 const char *turnOn_topic;
 const char *hello_topic;
 String turnOn_string = cmdtopic_base + "/" + String(MOBILE_ID) + "/turnOn";
 String hello_string = infotopic_base + "/" + String(MOBILE_ID) + "/hello";
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 32 // OLED display height, in pixels
 #define SDA D2
 #define SCL D1
 SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLEDDISPLAY_GEOMETRY  -  Extra param required for 128x32 displays.
@@ -48,10 +45,7 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 #define ONOFFBTTN D6
 #define NUM_BUTTONS 3
 #define DEBOUNCE_DELAY 50
-/*
-int lastPlusRead = 0;
-int currentPlusRead;
-*/
+
 int targetTemp=18;
 int currentTemp;
 int turnOn;
@@ -101,7 +95,6 @@ void handle_buttons(){
     //leggi i bottoni
     for(int i=0; i<NUM_BUTTONS; i++){
       buttons[i]-> current_state = digitalRead(buttons[i]->number);
-      //Serial.println("bottone " + String(i) + ": " + String(buttons[i]-> current_state));
     }
 
     //controlla gli stati
@@ -236,9 +229,6 @@ void setup() {
     dht.begin();
     sensor_t sensor;
   
-    // Set delay
-    delayMS = 50;
-  
     display.init();
     //display.flipScreenVertically();
     display.setFont(ArialMT_Plain_10);
@@ -246,11 +236,9 @@ void setup() {
     
     turnOn_topic = turnOn_string.c_str();
     hello_topic = hello_string.c_str();
-    
 }
 
 void loop() {
-    //delay(delayMS);
     if (!mqtt_client.connected()) {
         mqtt_reconnect();
     }
