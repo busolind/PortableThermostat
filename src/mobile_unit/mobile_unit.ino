@@ -27,6 +27,7 @@ SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLE
 #define TEMP_POS 0,0
 #define HUMID_POS 0,15
 #define TRGT_POS 64,0
+#define ONOFF_POS 64,15
 
 #define DHTPIN D4
 #define DHTTYPE    DHT11
@@ -42,6 +43,8 @@ int lastPlusRead = 0;
 int currentPlusRead;
 */
 int targetTemp=18;
+int currentTemp;
+int turnOn;
 
 typedef struct {
     int number;
@@ -176,29 +179,36 @@ void handle_temp(){
     // Get temperature event and print its value.
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
-        Serial.println(F("Error reading temperature!"));
+        //Serial.println(F("Error reading temperature!"));
         display.drawString(TEMP_POS, "T:E");
     }
     else {
+        /*
         Serial.print(F("Temperature: "));
         Serial.print(event.temperature);
         Serial.println(F("°C"));
+        */
+        currentTemp = event.temperature;
         display.drawString(TEMP_POS, "T: " + String(event.temperature) + "°C");
     }
     // Get humidity event and print its value.
     dht.humidity().getEvent(&event);
     if (isnan(event.relative_humidity)) {
-        Serial.println(F("Error reading humidity!"));
+        //Serial.println(F("Error reading humidity!"));
         display.drawString(HUMID_POS, "H:E");
     }
     else {
+        /*
         Serial.print(F("Humidity: "));
         Serial.print(event.relative_humidity);
         Serial.println(F("%"));
+        */
         display.drawString(HUMID_POS, "H: " + String(event.relative_humidity) + "%");
     }
 
     display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
+
+    
 }
 
 void setup() {
@@ -247,6 +257,21 @@ void loop() {
     handle_temp();
   
     handle_buttons();
+
+    //TODO: PID
+    if(targetTemp > currentTemp){
+        turnOn = 1;
+    } else {
+        turnOn = 0;
+    }
+
+    String str;
+    if(turnOn == 0)
+        str = "OFF";
+    else
+        str = "ON";
+
+    display.drawString(ONOFF_POS, str);
     
     display.display();
 }
