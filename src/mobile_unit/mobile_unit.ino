@@ -28,18 +28,80 @@ SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLE
 #define HUMID_POS 0,15
 #define TRGT_POS 64,0
 
-#define DHTPIN D5
+#define DHTPIN D4
 #define DHTTYPE    DHT11
 DHT_Unified dht(DHTPIN, DHTTYPE);
 
 #define PLUSBTTN D8
+#define MINUSBTTN D7
+#define ONOFFBTTN D6
+#define NUM_BUTTONS 3
+#define DEBOUNCE_DELAY 50
+/*
 int lastPlusRead = 0;
 int currentPlusRead;
+*/
 int targetTemp=18;
+
+typedef struct {
+    int number;
+    int current_state;
+    int last_state;
+    unsigned long last_debounce;
+} button_pin;
+
 
 uint32_t delayMS;
 
+//Bottoni: D8-PLUS-16 D7-MINUS-7 D6-ON/OFF-6
+button_pin plusbtn;
+button_pin minusbtn;
+button_pin onoffbtn;
+button_pin *buttons[NUM_BUTTONS];
 
+void setup_buttons(){
+    unsigned long now = millis();
+    
+    pinMode(PLUSBTTN, INPUT);
+    plusbtn.number=PLUSBTTN;
+    plusbtn.last_state = 0;
+    plusbtn.last_debounce = now;
+    buttons[0]=&plusbtn;
+
+    pinMode(MINUSBTTN, INPUT);
+    minusbtn.number=MINUSBTTN;
+    minusbtn.last_state = 0;
+    minusbtn.last_debounce = now;
+    buttons[1]=&minusbtn;
+
+    pinMode(ONOFFBTTN, INPUT);
+    onoffbtn.number=ONOFFBTTN;
+    onoffbtn.last_state = 0;
+    onoffbtn.last_debounce = now;
+    buttons[2]=&onoffbtn;
+    
+    
+}
+
+void handle_buttons(){
+    //leggi i bottoni
+    for(int i=0; i<NUM_BUTTONS; i++){
+      buttons[i]-> current_state = digitalRead(buttons[i]->number);
+      //Serial.println("bottone " + String(i) + ": " + String(buttons[i]-> current_state));
+    }
+
+    //controlla gli stati
+    if((plusbtn.current_state == 1) && (plusbtn.current_state != plusbtn.last_state) && (millis() - plusbtn.last_debounce > DEBOUNCE_DELAY)){
+      targetTemp++;
+    } else if((minusbtn.current_state == 1) && (minusbtn.current_state != minusbtn.last_state) && (millis() - minusbtn.last_debounce > DEBOUNCE_DELAY)){
+      targetTemp--;
+    }//TODO: on/off
+
+    //aggiorna i last state
+    for(int i=0; i<NUM_BUTTONS; i++){
+      buttons[i]-> last_state = buttons[i]-> current_state;
+    }
+}
 
 
 void setup_wifi() {
@@ -135,6 +197,8 @@ void handle_temp(){
         Serial.println(F("%"));
         display.drawString(HUMID_POS, "H: " + String(event.relative_humidity) + "%");
     }
+
+    display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
 }
 
 void setup() {
@@ -143,9 +207,10 @@ void setup() {
     pinMode(SDA, OUTPUT);
     pinMode(SCL, OUTPUT);
     pinMode(DHTPIN, OUTPUT);
-    pinMode(PLUSBTTN, OUTPUT);
+    
   
     setup_wifi();
+    setup_buttons();
     mqtt_client.setServer(mqtt_server, 1883);
     mqtt_client.setCallback(mqtt_callback);
 
@@ -161,7 +226,7 @@ void setup() {
 }
 
 void loop() {
-    delay(delayMS);
+    //delay(delayMS);
     if (!mqtt_client.connected()) {
         mqtt_reconnect();
     }
@@ -181,14 +246,7 @@ void loop() {
     
     handle_temp();
   
-  
-    //Senza debounce (c'è giusto il delay, per i test funziona)
-    currentPlusRead=digitalRead(PLUSBTTN);
-    if(currentPlusRead == 1 && (currentPlusRead != lastPlusRead)){
-        targetTemp++;
-    }
-    lastPlusRead=currentPlusRead;
-    display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
+    handle_buttons();
     
     display.display();
 }
