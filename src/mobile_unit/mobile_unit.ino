@@ -48,7 +48,7 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 #define NUM_BUTTONS 3
 #define DEBOUNCE_DELAY 50
 
-int targetTemp=18;
+float targetTemp=18;
 float currentTemp = -1;
 int turnOn;
 int last_turnOn = 0;
@@ -104,9 +104,9 @@ void handle_buttons(){
     unsigned long now = millis();
     //controlla gli stati
     if((plusbtn.current_state == HIGH) && (plusbtn.current_state != plusbtn.last_state) && (now - plusbtn.last_debounce > DEBOUNCE_DELAY)){
-        targetTemp++;
+        targetTemp+=0.1;
     } else if((minusbtn.current_state == HIGH) && (minusbtn.current_state != minusbtn.last_state) && (now - minusbtn.last_debounce > DEBOUNCE_DELAY)){
-        targetTemp--;
+        targetTemp-=0.1;
     } else if((enablebtn.current_state == HIGH) && (enablebtn.current_state != enablebtn.last_state) && (now - enablebtn.last_debounce > DEBOUNCE_DELAY)){
         enableThermostat = !enableThermostat;
     }
@@ -218,7 +218,7 @@ void draw_display(){
     display.setFont(ArialMT_Plain_24);
     display.drawString(TEMP_POS, String(currentTemp, 1) + "°");
     display.setFont(ArialMT_Plain_10);
-    display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
+    display.drawString(TRGT_POS, "SET:" + String(targetTemp, 1) + "°");
 
     String str;
     if(turnOn == 0)
