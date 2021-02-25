@@ -39,6 +39,7 @@ SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLE
 #define DHTPIN D4
 #define DHTTYPE    DHT11
 DHT_Unified dht(DHTPIN, DHTTYPE);
+#define SENSOR_DELAY 1000
 
 #define PLUSBTTN D8
 #define MINUSBTTN D7
@@ -47,9 +48,10 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 #define DEBOUNCE_DELAY 50
 
 int targetTemp=18;
-int currentTemp;
+float currentTemp = -1;
 int turnOn;
 int last_turnOn = 0;
+unsigned long last_measurement = 0;
 
 typedef struct {
     int number;
@@ -178,14 +180,13 @@ void publish_turnOn(){
 
 void handle_temp(){
     sensors_event_t event;
-    // Get temperature event and print its value.
+    // Get temperature event
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
-        display.drawString(TEMP_POS, "T:E");
+        Serial.println("Errore temperatura");
     }
     else {
         currentTemp = event.temperature;
-        display.drawString(TEMP_POS, "T: " + String(event.temperature) + "°C");
     }
     // Get humidity event and print its value.
     /*
@@ -197,10 +198,25 @@ void handle_temp(){
         display.drawString(HUMID_POS, "H: " + String(event.relative_humidity) + "%");
     }
     */
+}
 
+void draw_display(){
+    display.clear();
+
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(TEMP_POS, String(currentTemp, 1) + "°");
+    display.setFont(ArialMT_Plain_10);
     display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
 
+    String str;
+    if(turnOn == 0)
+        str = "OFF";
+    else
+        str = "ON";
+
+    display.drawString(ONOFF_POS, str);
     
+    display.display();
 }
 
 void setup() {
@@ -244,10 +260,11 @@ void loop() {
         mqtt_client.publish(hello_topic, msg);
     }
 
-    display.clear();
-    
-    handle_temp();
-  
+    if (now - last_measurement > SENSOR_DELAY){
+        last_measurement = now;
+        handle_temp();
+    }
+
     handle_buttons();
 
     //TODO: PID
@@ -262,13 +279,5 @@ void loop() {
     }
     last_turnOn = turnOn;
 
-    String str;
-    if(turnOn == 0)
-        str = "OFF";
-    else
-        str = "ON";
-
-    display.drawString(ONOFF_POS, str);
-    
-    display.display();
+    draw_display();
 }
