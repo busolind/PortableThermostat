@@ -20,13 +20,16 @@ unsigned long lastMsg = 0;
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
 
+#define MAX_NUMBER_OF_MOBILES (5)
+int thermostat_id = 0;
+
 unsigned long lastCmd = 0;
 String cmdtopic_base = "PortableThermostat/cmd/mobile";
 String infotopic_base = "PortableThermostat/info/mobile";
 const char *turnOn_topic;
 const char *hello_topic;
-String turnOn_string = cmdtopic_base + "/" + String(MOBILE_ID) + "/turnOn";
-String hello_string = infotopic_base + "/" + String(MOBILE_ID) + "/hello";
+String turnOn_string;
+String hello_string;
 
 #define SDA D2
 #define SCL D1
@@ -95,11 +98,30 @@ void setup_buttons(){
     
 }
 
-void handle_buttons(){
-    //leggi i bottoni
+void read_buttons(){
     for(int i=0; i<NUM_BUTTONS; i++){
         buttons[i] -> current_state = digitalRead(buttons[i]->number);
     }
+}
+void debounce_buttons(){
+    //aggiorna i last debounce
+    unsigned long now = millis();
+    for(int i=0; i<NUM_BUTTONS; i++){
+        if(buttons[i] -> current_state != buttons[i] -> last_state){
+            buttons[i] -> last_debounce = now;
+        }
+    }
+}
+
+void update_last_buttons_state(){
+    //aggiorna i last state
+    for(int i=0; i<NUM_BUTTONS; i++){
+      buttons[i]-> last_state = buttons[i]-> current_state;
+    }
+}
+
+void handle_buttons(){
+    read_buttons();
 
     unsigned long now = millis();
     //controlla gli stati
@@ -111,17 +133,37 @@ void handle_buttons(){
         enableThermostat = !enableThermostat;
     }
 
-    //aggiorna i last debounce
-    for(int i=0; i<NUM_BUTTONS; i++){
-        if(buttons[i] -> current_state != buttons[i] -> last_state){
-            buttons[i] -> last_debounce = now;
-        }
-    }
+    debounce_buttons();
+    update_last_buttons_state();
+    
+}
 
-    //aggiorna i last state
-    for(int i=0; i<NUM_BUTTONS; i++){
-      buttons[i]-> last_state = buttons[i]-> current_state;
-    }
+
+void setup_id(){
+    bool done = false;
+    do{
+        int id=0;
+        display.clear();
+        display.setFont(ArialMT_Plain_16);
+        display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
+        read_buttons();
+        unsigned long now = millis();
+        if((plusbtn.current_state == HIGH) && (plusbtn.current_state != plusbtn.last_state) && (now - plusbtn.last_debounce > DEBOUNCE_DELAY)){
+            thermostat_id++;
+        } else if((minusbtn.current_state == HIGH) && (minusbtn.current_state != minusbtn.last_state) && (now - minusbtn.last_debounce > DEBOUNCE_DELAY)){
+            thermostat_id--;
+        } else if((enablebtn.current_state == HIGH) && (enablebtn.current_state != enablebtn.last_state) && (now - enablebtn.last_debounce > DEBOUNCE_DELAY)){
+            done=true;
+        }
+        if(thermostat_id < 0){
+            thermostat_id += MAX_NUMBER_OF_MOBILES;
+        }
+        thermostat_id = thermostat_id % MAX_NUMBER_OF_MOBILES;
+        display.drawString(64, 16, "Scegli id: " + String(thermostat_id));
+        debounce_buttons();
+        update_last_buttons_state();
+        display.display();
+    } while(!done);
 }
 
 
@@ -214,7 +256,7 @@ void handle_temp(){
 
 void draw_display(){
     display.clear();
-
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.setFont(ArialMT_Plain_24);
     display.drawString(TEMP_POS, String(currentTemp, 1) + "°");
     display.setFont(ArialMT_Plain_10);
@@ -242,7 +284,6 @@ void setup() {
     pinMode(SCL, OUTPUT);
     pinMode(DHTPIN, OUTPUT);
     
-  
     setup_wifi();
     setup_buttons();
     mqtt_client.setServer(mqtt_server, 1883);
@@ -253,10 +294,12 @@ void setup() {
   
     display.init();
     //display.flipScreenVertically();
-    display.setFont(ArialMT_Plain_10);
 
+    setup_id();
     
+    turnOn_string = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
     turnOn_topic = turnOn_string.c_str();
+    hello_string = infotopic_base + "/" + String(thermostat_id) + "/hello";
     hello_topic = hello_string.c_str();
 }
 
