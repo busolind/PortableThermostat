@@ -35,6 +35,7 @@ SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLE
 #define HUMID_POS 0,15
 #define TRGT_POS 64,0
 #define ONOFF_POS 64,15
+#define ENABLED_POS 96,15
 
 #define DHTPIN D4
 #define DHTTYPE    DHT11
@@ -52,7 +53,7 @@ float currentTemp = -1;
 int turnOn;
 int last_turnOn = 0;
 unsigned long last_measurement = 0;
-bool enableThermostat
+bool enableThermostat = true;
 
 typedef struct {
     int number;
@@ -97,15 +98,25 @@ void setup_buttons(){
 void handle_buttons(){
     //leggi i bottoni
     for(int i=0; i<NUM_BUTTONS; i++){
-      buttons[i]-> current_state = digitalRead(buttons[i]->number);
+        buttons[i] -> current_state = digitalRead(buttons[i]->number);
     }
 
+    unsigned long now = millis();
     //controlla gli stati
-    if((plusbtn.current_state == 1) && (plusbtn.current_state != plusbtn.last_state) && (millis() - plusbtn.last_debounce > DEBOUNCE_DELAY)){
-      targetTemp++;
-    } else if((minusbtn.current_state == 1) && (minusbtn.current_state != minusbtn.last_state) && (millis() - minusbtn.last_debounce > DEBOUNCE_DELAY)){
-      targetTemp--;
-    }//TODO: on/off
+    if((plusbtn.current_state == HIGH) && (plusbtn.current_state != plusbtn.last_state) && (now - plusbtn.last_debounce > DEBOUNCE_DELAY)){
+        targetTemp++;
+    } else if((minusbtn.current_state == HIGH) && (minusbtn.current_state != minusbtn.last_state) && (now - minusbtn.last_debounce > DEBOUNCE_DELAY)){
+        targetTemp--;
+    } else if((enablebtn.current_state == HIGH) && (enablebtn.current_state != enablebtn.last_state) && (now - enablebtn.last_debounce > DEBOUNCE_DELAY)){
+        enableThermostat = !enableThermostat;
+    }
+
+    //aggiorna i last debounce
+    for(int i=0; i<NUM_BUTTONS; i++){
+        if(buttons[i] -> current_state != buttons[i] -> last_state){
+            buttons[i] -> last_debounce = now;
+        }
+    }
 
     //aggiorna i last state
     for(int i=0; i<NUM_BUTTONS; i++){
@@ -216,6 +227,10 @@ void draw_display(){
         str = "ON";
 
     display.drawString(ONOFF_POS, str);
+
+    if(enableThermostat){
+        display.drawString(ENABLED_POS, "EN");
+    }
     
     display.display();
 }
@@ -269,11 +284,16 @@ void loop() {
     handle_buttons();
 
     //TODO: PID
-    if(targetTemp > currentTemp){
-        turnOn = 1;
+    if(enableThermostat) {
+        if(targetTemp > currentTemp){
+            turnOn = 1;
+        } else {
+            turnOn = 0;
+        }
     } else {
         turnOn = 0;
     }
+    
 
     if (last_turnOn != turnOn || now - lastCmd > 10000) {
         publish_turnOn();
