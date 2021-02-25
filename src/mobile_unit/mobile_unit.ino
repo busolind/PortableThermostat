@@ -43,7 +43,7 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 
 #define PLUSBTTN D8
 #define MINUSBTTN D7
-#define ONOFFBTTN D6
+#define ENABLEBTTN D6
 #define NUM_BUTTONS 3
 #define DEBOUNCE_DELAY 50
 
@@ -52,6 +52,7 @@ float currentTemp = -1;
 int turnOn;
 int last_turnOn = 0;
 unsigned long last_measurement = 0;
+bool enableThermostat
 
 typedef struct {
     int number;
@@ -66,7 +67,7 @@ uint32_t delayMS;
 //Bottoni: D8-PLUS-16 D7-MINUS-7 D6-ON/OFF-6
 button_pin plusbtn;
 button_pin minusbtn;
-button_pin onoffbtn;
+button_pin enablebtn;
 button_pin *buttons[NUM_BUTTONS];
 
 void setup_buttons(){
@@ -84,11 +85,11 @@ void setup_buttons(){
     minusbtn.last_debounce = now;
     buttons[1]=&minusbtn;
 
-    pinMode(ONOFFBTTN, INPUT);
-    onoffbtn.number=ONOFFBTTN;
-    onoffbtn.last_state = 0;
-    onoffbtn.last_debounce = now;
-    buttons[2]=&onoffbtn;
+    pinMode(ENABLEBTTN, INPUT);
+    enablebtn.number=ENABLEBTTN;
+    enablebtn.last_state = 0;
+    enablebtn.last_debounce = now;
+    buttons[2]=&enablebtn;
     
     
 }
