@@ -181,32 +181,22 @@ void handle_temp(){
     // Get temperature event and print its value.
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
-        //Serial.println(F("Error reading temperature!"));
         display.drawString(TEMP_POS, "T:E");
     }
     else {
-        /*
-        Serial.print(F("Temperature: "));
-        Serial.print(event.temperature);
-        Serial.println(F("°C"));
-        */
         currentTemp = event.temperature;
         display.drawString(TEMP_POS, "T: " + String(event.temperature) + "°C");
     }
     // Get humidity event and print its value.
+    /*
     dht.humidity().getEvent(&event);
     if (isnan(event.relative_humidity)) {
-        //Serial.println(F("Error reading humidity!"));
         display.drawString(HUMID_POS, "H:E");
     }
     else {
-        /*
-        Serial.print(F("Humidity: "));
-        Serial.print(event.relative_humidity);
-        Serial.println(F("%"));
-        */
         display.drawString(HUMID_POS, "H: " + String(event.relative_humidity) + "%");
     }
+    */
 
     display.drawString(TRGT_POS, "TRGET:" + String(targetTemp) + "°C");
 
