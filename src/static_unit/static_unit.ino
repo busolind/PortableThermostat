@@ -25,6 +25,8 @@ short currentlyOn = -1;
 #define RELAY_PIN D5
 #define NUMBER_OF_MOBILES (5)
 short mobiles[NUMBER_OF_MOBILES]; //Memorizza lo stato dei termostati: -1 se unknown, 0 se non richiedono riscaldamento, 1 se lo richiedono
+unsigned long last_updates[NUMBER_OF_MOBILES]; //Usato per "invecchiamento" degli stati dei termostati. Se un termostato non comunica per più di un certo numero di ms si resetta il suo stato a unknown
+#define AGING_THRESHOLD 300000
 
 void setup_wifi() {
     digitalWrite(BUILTIN_LED, LOW);
@@ -65,6 +67,7 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
 
     if(index < NUMBER_OF_MOBILES){ //Non dovrebbe essere necessario perché non sottoscrive nessun topic diverso da quelli con numeri compatibili
         mobiles[index] = (payload[0] - '0');
+        last_updates[index] = millis();
     }
     delay(50);
     digitalWrite(BUILTIN_LED, HIGH);
@@ -146,6 +149,14 @@ void loop() {
 
     if(now - lastCheck > 2000){
         lastCheck=now;
+        
+        //invecchiamento
+        for(int i=0; i < NUMBER_OF_MOBILES; i++){
+            if(mobiles[i] != -1 && now - last_updates[i] > AGING_THRESHOLD){
+                mobiles[i] = -1;
+            }
+        }
+        
         bool turnOn = false;
         for(int i=0; i < NUMBER_OF_MOBILES; i++){
             if(mobiles[i] == 1){
