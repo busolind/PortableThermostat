@@ -63,7 +63,7 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     Serial.println();
     
     digitalWrite(BUILTIN_LED, LOW);
-    byte index = topic[(strlen(cmdtopic) +1)] - '0'; //Estrae il numero del termostato mobile dal percorso del topic
+    int index = atoi((char*)&topic[(strlen(cmdtopic) + 1)]); //Estrae il numero del termostato mobile dal percorso del topic
 
     if(index < NUMBER_OF_MOBILES){ //Non dovrebbe essere necessario perché non sottoscrive nessun topic diverso da quelli con numeri compatibili
         mobiles[index] = (payload[0] - '0');
