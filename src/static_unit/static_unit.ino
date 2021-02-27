@@ -3,7 +3,7 @@
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
-const char *mqtt_server = "192.168.178.100";
+const char *mqtt_server = "192.168.178.10";
 
 const char *cmdtopic = "PortableThermostat/cmd/mobile";
 const char *infotopic = "PortableThermostat/info/static/isOn";

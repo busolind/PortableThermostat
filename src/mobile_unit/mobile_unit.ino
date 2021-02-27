@@ -11,7 +11,7 @@
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
-const char *mqtt_server = "192.168.178.100";
+const char *mqtt_server = "192.168.178.10";
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
