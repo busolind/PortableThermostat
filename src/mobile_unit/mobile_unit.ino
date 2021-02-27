@@ -74,6 +74,15 @@ button_pin minusbtn;
 button_pin enablebtn;
 button_pin *buttons[NUM_BUTTONS];
 
+#define FLAME_WIDTH 16
+#define FLAME_HEIGHT 16
+const uint8_t FlameLogo_bits[] PROGMEM = {
+    0xC0, 0x00, 0xC0, 0x00, 0xE0, 0x00, 0xE0, 0x01, 0xF0, 0x03, 0xF0, 0x03, 
+    0xF8, 0x07, 0xF8, 0x0F, 0xF8, 0x0F, 0xFC, 0x0F, 0xBC, 0x1F, 0x3C, 0x1F, 
+    0x3C, 0x1F, 0x38, 0x1E, 0x38, 0x0C, 0x30, 0x0C,
+};
+
+
 void setup_buttons(){
     unsigned long now = millis();
     
@@ -103,6 +112,7 @@ void read_buttons(){
         buttons[i] -> current_state = digitalRead(buttons[i]->number);
     }
 }
+
 void debounce_buttons(){
     //aggiorna i last debounce
     unsigned long now = millis();
@@ -138,7 +148,6 @@ void handle_buttons(){
     
 }
 
-
 void setup_id(){
     bool done = false;
     do{
@@ -165,7 +174,6 @@ void setup_id(){
         display.display();
     } while(!done);
 }
-
 
 void setup_wifi() {
 
@@ -262,13 +270,9 @@ void draw_display(){
     display.setFont(ArialMT_Plain_10);
     display.drawString(TRGT_POS, "SET:" + String(targetTemp, 1) + "°");
 
-    String str;
-    if(turnOn == 0)
-        str = "OFF";
-    else
-        str = "ON";
-
-    display.drawString(ONOFF_POS, str);
+    if(turnOn){
+        display.drawXbm(ONOFF_POS, FLAME_WIDTH, FLAME_HEIGHT, FlameLogo_bits);
+    }
 
     if(enableThermostat){
         display.drawString(ENABLED_POS, "EN");
