@@ -88,23 +88,29 @@ void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, LOW);
     // Loop until we're reconnected
     while (!mqtt_client.connected()) {
-        Serial.print("Attempting MQTT connection...");
-        // Create a random client ID
-        String clientId = "ESP8266Client-";
-        clientId += String(random(0xffff), HEX);
-        // Attempt to connect
-        if (mqtt_client.connect(clientId.c_str())) {
-            Serial.println("connected");
-            // Once connected, publish an announcement...
-            mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
-            // ... and resubscribe
-            mqtt_subscribe_to_mobiles(mqtt_client, NUMBER_OF_MOBILES, cmdtopic);
-        } else {
-            Serial.print("failed, rc=");
-            Serial.print(mqtt_client.state());
-            Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
+        if(WiFi.status() != WL_CONNECTED){
+            Serial.println("Wifi non connesso: evito connessione MQTT");
             delay(5000);
+        } else {
+        
+            Serial.print("Attempting MQTT connection...");
+            // Create a random client ID
+            String clientId = "ESP8266Client-";
+            clientId += String(random(0xffff), HEX);
+            // Attempt to connect
+            if (mqtt_client.connect(clientId.c_str())) {
+                Serial.println("connected");
+                // Once connected, publish an announcement...
+                mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
+                // ... and resubscribe
+                mqtt_subscribe_to_mobiles(mqtt_client, NUMBER_OF_MOBILES, cmdtopic);
+            } else {
+                Serial.print("failed, rc=");
+                Serial.print(mqtt_client.state());
+                Serial.println(" try again in 5 seconds");
+                // Wait 5 seconds before retrying
+                delay(5000);
+            }
         }
     }
     digitalWrite(BUILTIN_LED, HIGH);
