@@ -15,10 +15,9 @@ const char *mqtt_server = "192.168.178.10";
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
-unsigned long lastMsg = 0;
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
-int value = 0;
+unsigned long last_info = 0;
 
 #define MAX_NUMBER_OF_MOBILES (5)
 int thermostat_id = 0;
@@ -29,9 +28,8 @@ unsigned long last_reconnect_attempt = 0;
 String cmdtopic_base = "PortableThermostat/cmd/mobile";
 String infotopic_base = "PortableThermostat/info/mobile";
 const char *turnOn_topic;
-const char *hello_topic;
 String turnOn_string;
-String hello_string;
+String info_string;
 
 #define SDA D2
 #define SCL D1
@@ -53,8 +51,9 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 #define NUM_BUTTONS 3
 #define DEBOUNCE_DELAY 50
 
-float targetTemp=18;
-float currentTemp = -1;
+float target_temp=18;
+float current_temp = -1;
+float current_humidity = -1;
 int turnOn;
 int last_turnOn = 0;
 unsigned long last_measurement = 0;
@@ -138,9 +137,9 @@ void handle_buttons(){
     unsigned long now = millis();
     //controlla gli stati
     if((plusbtn.current_state == HIGH) && (plusbtn.current_state != plusbtn.last_state) && (now - plusbtn.last_debounce > DEBOUNCE_DELAY)){
-        targetTemp+=0.1;
+        target_temp+=0.1;
     } else if((minusbtn.current_state == HIGH) && (minusbtn.current_state != minusbtn.last_state) && (now - minusbtn.last_debounce > DEBOUNCE_DELAY)){
-        targetTemp-=0.1;
+        target_temp-=0.1;
     } else if((enablebtn.current_state == HIGH) && (enablebtn.current_state != enablebtn.last_state) && (now - enablebtn.last_debounce > DEBOUNCE_DELAY)){
         enableThermostat = !enableThermostat;
     }
@@ -221,8 +220,6 @@ bool mqtt_reconnect() {
     if (mqtt_client.connect(clientId.c_str())) {
         Serial.println("connected");
         digitalWrite(BUILTIN_LED, HIGH);
-        // Once connected, publish an announcement...
-        mqtt_client.publish(hello_topic, "hello world");
     } else {
         Serial.print("failed, rc=");
         Serial.println(mqtt_client.state());
@@ -239,35 +236,48 @@ void publish_turnOn(){
     mqtt_client.publish(turnOn_topic, cmd);
 }
 
-void handle_temp(){
+void publish_infos(){
+    //pubblica temp
+    info_string = infotopic_base + "/" + String(thermostat_id) + "/temp";
+    snprintf(msg, MSG_BUFFER_SIZE, "%.2f", current_temp);
+    Serial.print("Publish message: ");
+    Serial.println(msg);
+    mqtt_client.publish(info_string.c_str(), msg);
+    //pubblica humid
+    info_string = infotopic_base + "/" + String(thermostat_id) + "/humid";
+    snprintf(msg, MSG_BUFFER_SIZE, "%.2f", current_humidity);
+    Serial.print("Publish message: ");
+    Serial.println(msg);
+    mqtt_client.publish(info_string.c_str(), msg);
+}
+
+void get_sensor_data(){
     sensors_event_t event;
     // Get temperature event
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
-        Serial.println("Errore temperatura");
+        Serial.println("Temperature read error");
     }
     else {
-        currentTemp = event.temperature;
+        current_temp = event.temperature;
     }
-    // Get humidity event and print its value.
-    /*
+    // Get humidity event
     dht.humidity().getEvent(&event);
     if (isnan(event.relative_humidity)) {
-        display.drawString(HUMID_POS, "H:E");
+        Serial.println("Humidity read error");
     }
     else {
-        display.drawString(HUMID_POS, "H: " + String(event.relative_humidity) + "%");
+        current_humidity = event.relative_humidity;
     }
-    */
 }
 
 void draw_display(){
     display.clear();
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.setFont(ArialMT_Plain_24);
-    display.drawString(TEMP_POS, String(currentTemp, 1) + "°");
+    display.drawString(TEMP_POS, String(current_temp, 1) + "°");
     display.setFont(ArialMT_Plain_10);
-    display.drawString(TRGT_POS, "SET:" + String(targetTemp, 1) + "°");
+    display.drawString(TRGT_POS, "SET:" + String(target_temp, 1) + "°");
 
     if(turnOn){
         display.drawXbm(ONOFF_POS, FLAME_WIDTH, FLAME_HEIGHT, FlameLogo_bits);
@@ -301,8 +311,6 @@ void setup() {
     
     turnOn_string = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
     turnOn_topic = turnOn_string.c_str();
-    hello_string = infotopic_base + "/" + String(thermostat_id) + "/hello";
-    hello_topic = hello_string.c_str();
 }
 
 void loop() {
@@ -316,25 +324,16 @@ void loop() {
     }
     mqtt_client.loop();
 
-    if (now - lastMsg > 20000) {
-        lastMsg = now;
-        ++value;
-        snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
-        Serial.print("Publish message: ");
-        Serial.println(msg);
-        mqtt_client.publish(hello_topic, msg);
-    }
-
     if (now - last_measurement > SENSOR_DELAY){
         last_measurement = now;
-        handle_temp();
+        get_sensor_data();
     }
 
     handle_buttons();
 
     //TODO: PID
     if(enableThermostat) {
-        if(targetTemp > currentTemp){
+        if(target_temp > current_temp){
             turnOn = 1;
         } else {
             turnOn = 0;
@@ -348,6 +347,11 @@ void loop() {
         publish_turnOn();
     }
     last_turnOn = turnOn;
+
+    if (now - last_info > 10000) {
+        last_info = now;
+        publish_infos();
+    }
 
     draw_display();
 }
