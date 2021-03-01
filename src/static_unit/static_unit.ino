@@ -73,8 +73,8 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     digitalWrite(BUILTIN_LED, HIGH);
 }
 
-//Sottoscrive iterativamente ai topic relativi a ciascun termostato mobile in base al numero specificato in mobilecount
-void mqtt_subscribe_to_mobiles(PubSubClient client, int mobilecount, const char* cmdtopic){
+//Sottoscrive iterativamente ai topic relativi a ciascun termostato mobile
+void mqtt_subscribe_to_mobiles(){
     for(int i=0; i<NUMBER_OF_MOBILES; i++){
         snprintf(topic_buffer, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic, i);
         Serial.print("Subscribed to topic [");
@@ -88,29 +88,23 @@ void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, LOW);
     // Loop until we're reconnected
     while (!mqtt_client.connected()) {
-        if(WiFi.status() != WL_CONNECTED){
-            Serial.println("Wifi non connesso: evito connessione MQTT");
-            delay(5000);
+        Serial.print("Attempting MQTT connection...");
+        // Create a random client ID
+        String clientId = "ESP8266Client-";
+        clientId += String(random(0xffff), HEX);
+        // Attempt to connect
+        if (mqtt_client.connect(clientId.c_str())) {
+            Serial.println("connected");
+            // Once connected, publish an announcement...
+            mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
+            // ... and resubscribe
+            mqtt_subscribe_to_mobiles();
         } else {
-        
-            Serial.print("Attempting MQTT connection...");
-            // Create a random client ID
-            String clientId = "ESP8266Client-";
-            clientId += String(random(0xffff), HEX);
-            // Attempt to connect
-            if (mqtt_client.connect(clientId.c_str())) {
-                Serial.println("connected");
-                // Once connected, publish an announcement...
-                mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
-                // ... and resubscribe
-                mqtt_subscribe_to_mobiles(mqtt_client, NUMBER_OF_MOBILES, cmdtopic);
-            } else {
-                Serial.print("failed, rc=");
-                Serial.print(mqtt_client.state());
-                Serial.println(" try again in 5 seconds");
-                // Wait 5 seconds before retrying
-                delay(5000);
-            }
+            Serial.print("failed, rc=");
+            Serial.print(mqtt_client.state());
+            Serial.println(" try again in 5 seconds");
+            // Wait 5 seconds before retrying
+            delay(5000);
         }
     }
     digitalWrite(BUILTIN_LED, HIGH);
@@ -180,14 +174,4 @@ void loop() {
         char buf[10];
         mqtt_client.publish(infotopic, itoa(currentlyOn, buf, 10));
     }
-
-
-
-
-
-
-
-
-
-    
 }
