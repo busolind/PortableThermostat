@@ -24,6 +24,8 @@ int value = 0;
 int thermostat_id = 0;
 
 unsigned long lastCmd = 0;
+unsigned long last_reconnect_attempt = 0;
+#define RECONNECT_DELAY 5000
 String cmdtopic_base = "PortableThermostat/cmd/mobile";
 String infotopic_base = "PortableThermostat/info/mobile";
 const char *turnOn_topic;
@@ -209,26 +211,23 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     Serial.println();
 }
 
-void mqtt_reconnect() {
-    // Loop until we're reconnected
-    while (!mqtt_client.connected()) {
-        Serial.print("Attempting MQTT connection...");
-        // Create a random client ID
-        String clientId = "ESP8266Client-";
-        clientId += String(random(0xffff), HEX);
-        // Attempt to connect
-        if (mqtt_client.connect(clientId.c_str())) {
-            Serial.println("connected");
-            // Once connected, publish an announcement...
-            mqtt_client.publish(hello_topic, "hello world");
-        } else {
-            Serial.print("failed, rc=");
-            Serial.print(mqtt_client.state());
-            Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
-            delay(5000);
-        }
+bool mqtt_reconnect() {
+    digitalWrite(BUILTIN_LED, LOW);
+    Serial.print("Attempting MQTT connection...");
+    // Create a random client ID
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+    if (mqtt_client.connect(clientId.c_str())) {
+        Serial.println("connected");
+        digitalWrite(BUILTIN_LED, HIGH);
+        // Once connected, publish an announcement...
+        mqtt_client.publish(hello_topic, "hello world");
+    } else {
+        Serial.print("failed, rc=");
+        Serial.println(mqtt_client.state());
     }
+    return mqtt_client.connected();
 }
 
 void publish_turnOn(){
@@ -294,7 +293,6 @@ void setup() {
     mqtt_client.setCallback(mqtt_callback);
 
     dht.begin();
-    sensor_t sensor;
   
     display.init();
     //display.flipScreenVertically();
@@ -308,12 +306,16 @@ void setup() {
 }
 
 void loop() {
+    unsigned long now = millis();
     if (!mqtt_client.connected()) {
-        mqtt_reconnect();
+        if(now - last_reconnect_attempt > RECONNECT_DELAY){
+            last_reconnect_attempt = now;
+            //Attempt to reconnect
+            mqtt_reconnect();
+        }
     }
     mqtt_client.loop();
 
-    unsigned long now = millis();
     if (now - lastMsg > 20000) {
         lastMsg = now;
         ++value;
