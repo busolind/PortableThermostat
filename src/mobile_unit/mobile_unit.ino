@@ -51,7 +51,8 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 #define NUM_BUTTONS 3
 #define DEBOUNCE_DELAY 50
 
-float target_temp=18;
+#define HYSTERESIS 0.5
+float target_temp=20;
 float current_temp = -1;
 float current_humidity = -1;
 int turnOn;
@@ -333,9 +334,9 @@ void loop() {
 
     //TODO: PID
     if(enableThermostat) {
-        if(target_temp > current_temp){
+        if(turnOn == 0 && current_temp < (target_temp - HYSTERESIS)){
             turnOn = 1;
-        } else {
+        } else if(turnOn == 1 && current_temp > (target_temp + HYSTERESIS)) {
             turnOn = 0;
         }
     } else {
@@ -343,7 +344,7 @@ void loop() {
     }
     
 
-    if (last_turnOn != turnOn || now - lastCmd > 10000) {
+    if (last_turnOn != turnOn || now - lastCmd > 5000) {
         publish_turnOn();
     }
     last_turnOn = turnOn;
