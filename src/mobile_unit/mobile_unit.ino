@@ -23,7 +23,6 @@ Scheduler ts;
 #define MAX_NUMBER_OF_MOBILES (5)
 int thermostat_id = 0;
 
-unsigned long lastCmd = 0;
 unsigned long last_reconnect_attempt = 0;
 #define RECONNECT_DELAY 5000
 String cmdtopic_base = "PortableThermostat/cmd/mobile";
@@ -208,7 +207,7 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     Serial.println();
 }
 
-bool mqtt_reconnect() {
+void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, LOW);
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
@@ -222,8 +221,8 @@ bool mqtt_reconnect() {
         Serial.print("failed, rc=");
         Serial.println(mqtt_client.state());
     }
-    return mqtt_client.connected();
 }
+Task mqtt_reconnect_task(RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
 
 void publish_turnOn(){
     char cmd[5];
@@ -320,15 +319,13 @@ void setup() {
     turnOn_string = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
     turnOn_topic = turnOn_string.c_str();
 
-
+    ts.addTask(mqtt_reconnect_task);
     ts.addTask(handle_buttons_task);
     handle_buttons_task.enable();
     ts.addTask(get_sensor_data_task);
     get_sensor_data_task.enable();
     ts.addTask(publish_turnOn_task);
-    publish_turnOn_task.enable();
     ts.addTask(publish_infos_task);
-    publish_infos_task.enable();
     ts.addTask(draw_display_task);
     draw_display_task.enable();
 }
@@ -336,11 +333,13 @@ void setup() {
 void loop() {
     unsigned long now = millis();
     if (!mqtt_client.connected()) {
-        if(now - last_reconnect_attempt > RECONNECT_DELAY){
-            last_reconnect_attempt = now;
-            //Attempt to reconnect
-            mqtt_reconnect();
-        }
+        mqtt_reconnect_task.enableIfNot();
+        publish_turnOn_task.disable();
+        publish_infos_task.disable();
+    } else {
+        mqtt_reconnect_task.disable();
+        publish_turnOn_task.enableIfNot();
+        publish_infos_task.enableIfNot();
     }
     mqtt_client.loop();
 
