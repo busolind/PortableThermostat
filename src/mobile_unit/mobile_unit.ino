@@ -6,8 +6,7 @@
 #include <DHT_U.h>
 
 #include <SSD1306Wire.h>
-
-#define MOBILE_ID 0
+#include <TaskScheduler.h>
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
@@ -18,6 +17,8 @@ PubSubClient mqtt_client(espClient);
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
 unsigned long last_info = 0;
+
+Scheduler ts;
 
 #define MAX_NUMBER_OF_MOBILES (5)
 int thermostat_id = 0;
@@ -35,13 +36,12 @@ String info_string;
 #define SCL D1
 SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLEDDISPLAY_GEOMETRY  -  Extra param required for 128x32 displays.
 #define TEMP_POS 0,0
-#define HUMID_POS 0,15
 #define TRGT_POS 64,0
 #define ONOFF_POS 64,15
 #define ENABLED_POS 96,15
 
 #define DHTPIN D4
-#define DHTTYPE    DHT11
+#define DHTTYPE DHT11
 DHT_Unified dht(DHTPIN, DHTTYPE);
 #define SENSOR_DELAY 1000
 
@@ -67,10 +67,6 @@ typedef struct {
     unsigned long last_debounce;
 } button_pin;
 
-
-uint32_t delayMS;
-
-//Bottoni: D8-PLUS-16 D7-MINUS-7 D6-ON/OFF-6
 button_pin plusbtn;
 button_pin minusbtn;
 button_pin enablebtn;
@@ -149,6 +145,7 @@ void handle_buttons(){
     update_last_buttons_state();
     
 }
+Task handle_buttons_task(TASK_IMMEDIATE, TASK_FOREVER, handle_buttons);
 
 void setup_id(){
     bool done = false;
@@ -229,13 +226,13 @@ bool mqtt_reconnect() {
 }
 
 void publish_turnOn(){
-    lastCmd = millis();
     char cmd[5];
     itoa(turnOn, cmd, 10);
     Serial.print("Publish message [" + String(turnOn_topic) + "]: ");
     Serial.println(cmd);
     mqtt_client.publish(turnOn_topic, cmd);
 }
+Task publish_turnOn_task(5 * TASK_SECOND, TASK_FOREVER, publish_turnOn);
 
 void publish_infos(){
     //pubblica temp
@@ -259,6 +256,7 @@ void publish_infos(){
     Serial.println(msg);
     mqtt_client.publish(info_string.c_str(), msg);
 }
+Task publish_infos_task(10 * TASK_SECOND, TASK_FOREVER, publish_infos);
 
 void get_sensor_data(){
     sensors_event_t event;
@@ -279,6 +277,7 @@ void get_sensor_data(){
         current_humidity = event.relative_humidity;
     }
 }
+Task get_sensor_data_task(TASK_SECOND, TASK_FOREVER, get_sensor_data);
 
 void draw_display(){
     display.clear();
@@ -298,6 +297,7 @@ void draw_display(){
     
     display.display();
 }
+Task draw_display_task(TASK_IMMEDIATE, TASK_FOREVER, draw_display);
 
 void setup() {
     Serial.begin(115200);
@@ -314,12 +314,23 @@ void setup() {
     dht.begin();
   
     display.init();
-    //display.flipScreenVertically();
 
     setup_id();
     
     turnOn_string = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
     turnOn_topic = turnOn_string.c_str();
+
+
+    ts.addTask(handle_buttons_task);
+    handle_buttons_task.enable();
+    ts.addTask(get_sensor_data_task);
+    get_sensor_data_task.enable();
+    ts.addTask(publish_turnOn_task);
+    publish_turnOn_task.enable();
+    ts.addTask(publish_infos_task);
+    publish_infos_task.enable();
+    ts.addTask(draw_display_task);
+    draw_display_task.enable();
 }
 
 void loop() {
@@ -333,13 +344,6 @@ void loop() {
     }
     mqtt_client.loop();
 
-    if (now - last_measurement > SENSOR_DELAY){
-        last_measurement = now;
-        get_sensor_data();
-    }
-
-    handle_buttons();
-
     //TODO: PID
     if(enableThermostat) {
         if(turnOn == 0 && current_temp < (target_temp - HYSTERESIS)){
@@ -350,17 +354,5 @@ void loop() {
     } else {
         turnOn = 0;
     }
-    
-
-    if (last_turnOn != turnOn || now - lastCmd > 5000) {
-        publish_turnOn();
-    }
-    last_turnOn = turnOn;
-
-    if (now - last_info > 10000) {
-        last_info = now;
-        publish_infos();
-    }
-
-    draw_display();
+    ts.execute();
 }
