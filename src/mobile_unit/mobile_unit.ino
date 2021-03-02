@@ -51,7 +51,7 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 #define NUM_BUTTONS 3
 #define DEBOUNCE_DELAY 50
 
-#define HYSTERESIS 0.5
+#define HYSTERESIS 0.3
 float target_temp=20;
 float current_temp = -1;
 float current_humidity = -1;
@@ -232,7 +232,7 @@ void publish_turnOn(){
     lastCmd = millis();
     char cmd[5];
     itoa(turnOn, cmd, 10);
-    Serial.print("Publish message: ");
+    Serial.print("Publish message [" + String(turnOn_topic) + "]: ");
     Serial.println(cmd);
     mqtt_client.publish(turnOn_topic, cmd);
 }
@@ -241,13 +241,21 @@ void publish_infos(){
     //pubblica temp
     info_string = infotopic_base + "/" + String(thermostat_id) + "/temp";
     snprintf(msg, MSG_BUFFER_SIZE, "%.2f", current_temp);
-    Serial.print("Publish message: ");
+    Serial.print("Publish message [" + info_string + "]: ");
     Serial.println(msg);
     mqtt_client.publish(info_string.c_str(), msg);
+
     //pubblica humid
     info_string = infotopic_base + "/" + String(thermostat_id) + "/humid";
     snprintf(msg, MSG_BUFFER_SIZE, "%.2f", current_humidity);
-    Serial.print("Publish message: ");
+    Serial.print("Publish message [" + info_string + "]: ");
+    Serial.println(msg);
+    mqtt_client.publish(info_string.c_str(), msg);
+
+    //pubblica target
+    info_string = infotopic_base + "/" + String(thermostat_id) + "/target";
+    snprintf(msg, MSG_BUFFER_SIZE, "%.2f", target_temp);
+    Serial.print("Publish message [" + info_string + "]: ");
     Serial.println(msg);
     mqtt_client.publish(info_string.c_str(), msg);
 }
