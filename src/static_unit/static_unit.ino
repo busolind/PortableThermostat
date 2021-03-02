@@ -12,7 +12,6 @@ const char *infotopic = "PortableThermostat/info/static/isOn";
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
-unsigned long lastMsg = 0;
 unsigned long lastCheck = 0;
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
@@ -96,8 +95,6 @@ bool mqtt_reconnect() {
     if (mqtt_client.connect(clientId.c_str())) {
         Serial.println("connected");
         digitalWrite(BUILTIN_LED, HIGH);
-        // Once connected, publish an announcement...
-        mqtt_client.publish("PortableThermostat/info/static/hello", "hello world");
         // ... and resubscribe
         mqtt_subscribe_to_mobiles();
     } else {
@@ -138,15 +135,6 @@ void loop() {
         }
     }
     mqtt_client.loop();
-    
-    if (now - lastMsg > 20000) {
-        lastMsg = now;
-        ++value;
-        snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
-        Serial.print("Publish message: ");
-        Serial.println(msg);
-        mqtt_client.publish("PortableThermostat/info/static/hello", msg);
-    }
 
     if(now - lastCheck > 2000){
         lastCheck=now;
@@ -172,7 +160,9 @@ void loop() {
             digitalWrite(RELAY_PIN, LOW);
             currentlyOn = 0;
         }
-        char buf[10];
-        mqtt_client.publish(infotopic, itoa(currentlyOn, buf, 10));
+        itoa(currentlyOn, msg, 10);
+        Serial.print("Publish message [" + String(infotopic) + "]: ");
+        Serial.println(msg);
+        mqtt_client.publish(infotopic, msg);
     }
 }
