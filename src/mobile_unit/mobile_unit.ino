@@ -344,10 +344,12 @@ void loop() {
     mqtt_client.loop();
 
     //TODO: PID
+
+    //Se termostato è abilitato, verifica che ci sia bisogno di accendere (con isteresi)
     if(enableThermostat) {
-        if(turnOn == 0 && current_temp < (target_temp - HYSTERESIS)){
+        if(turnOn == 0 && current_temp <= (target_temp - HYSTERESIS)){
             turnOn = 1;
-        } else if(turnOn == 1 && current_temp > (target_temp + HYSTERESIS)) {
+        } else if(turnOn == 1 && current_temp >= (target_temp + HYSTERESIS)) {
             turnOn = 0;
         }
     } else {
