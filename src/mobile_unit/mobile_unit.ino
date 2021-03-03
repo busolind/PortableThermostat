@@ -34,9 +34,9 @@ String info_string;
 #define SDA D2
 #define SCL D1
 SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLEDDISPLAY_GEOMETRY  -  Extra param required for 128x32 displays.
-#define TEMP_POS 0,0
-#define TRGT_POS 64,0
-#define ONOFF_POS 64,15
+#define TEMP_POS 0,2
+#define TRGT_POS 80,0
+#define FLAME_POS 60,8
 #define ENABLED_POS 96,15
 #define ID_POS 128, 15  //Il numero rimane sulla sinistra del punto indicato
 
@@ -167,7 +167,7 @@ void setup_id(){
             thermostat_id += MAX_NUMBER_OF_MOBILES;
         }
         thermostat_id = thermostat_id % MAX_NUMBER_OF_MOBILES;
-        display.drawString(64, 16, "Scegli id: " + String(thermostat_id));
+        display.drawString(64, 14, "Scegli id: " + String(thermostat_id));
         debounce_buttons();
         update_last_buttons_state();
         display.display();
@@ -288,7 +288,7 @@ void draw_display(){
     display.drawString(TRGT_POS, "SET:" + String(target_temp, 1) + "°");
 
     if(turnOn){
-        display.drawXbm(ONOFF_POS, FLAME_WIDTH, FLAME_HEIGHT, FlameLogo_bits);
+        display.drawXbm(FLAME_POS, FLAME_WIDTH, FLAME_HEIGHT, FlameLogo_bits);
     }
 
     if(enableThermostat){
