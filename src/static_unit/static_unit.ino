@@ -8,7 +8,7 @@ const char *mqtt_server = "192.168.178.10";
 unsigned long last_reconnect_attempt = 0;
 #define RECONNECT_DELAY 5000
 const char *cmdtopic = "PortableThermostat/cmd/mobile";
-const char *infotopic = "PortableThermostat/info/static/isOn";
+const char *infotopic = "PortableThermostat/info/static/currentlyOn";
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
@@ -19,6 +19,7 @@ char msg[MSG_BUFFER_SIZE];
 #define TOPIC_BUFFER_SIZE (150)
 char topic_buffer[TOPIC_BUFFER_SIZE];
 
+bool turnOn = false;
 short currentlyOn = -1;
 
 #define RELAY_PIN D5
@@ -106,6 +107,43 @@ void init_mobile_arr(short mobilearr[], int mobilecount){
     }
 }
 
+void check_mobiles_aging(){
+    //invecchiamento
+    unsigned long now = millis();
+    for(int i=0; i < NUMBER_OF_MOBILES; i++){
+        if(mobiles[i] != -1 && now - last_updates[i] > AGING_THRESHOLD){
+            mobiles[i] = -1;
+        }
+    }
+}
+
+void update_turnOn(){
+    turnOn = false;
+    for(int i=0; i < NUMBER_OF_MOBILES; i++){
+        if(mobiles[i] == 1){
+            turnOn = true;
+            break;
+        }
+    }
+}
+
+void handle_relay(){
+    if(turnOn == true){
+        digitalWrite(RELAY_PIN, HIGH);
+        currentlyOn = 1;
+    } else {
+        digitalWrite(RELAY_PIN, LOW);
+        currentlyOn = 0;
+    }
+}
+
+void publish_currentlyOn(){
+    itoa(currentlyOn, msg, 10);
+    Serial.print("Publish message [" + String(infotopic) + "]: ");
+    Serial.println(msg);
+    mqtt_client.publish(infotopic, msg);
+}
+
 
 void setup() {
     Serial.begin(115200);
@@ -134,30 +172,12 @@ void loop() {
     if(now - lastCheck > 2000){
         lastCheck=now;
         
-        //invecchiamento
-        for(int i=0; i < NUMBER_OF_MOBILES; i++){
-            if(mobiles[i] != -1 && now - last_updates[i] > AGING_THRESHOLD){
-                mobiles[i] = -1;
-            }
-        }
+        check_mobiles_aging();
         
-        bool turnOn = false;
-        for(int i=0; i < NUMBER_OF_MOBILES; i++){
-            if(mobiles[i] == 1){
-                turnOn = true;
-                break;
-            }
-        }
-        if(turnOn == true){
-            digitalWrite(RELAY_PIN, HIGH);
-            currentlyOn = 1;
-        } else {
-            digitalWrite(RELAY_PIN, LOW);
-            currentlyOn = 0;
-        }
-        itoa(currentlyOn, msg, 10);
-        Serial.print("Publish message [" + String(infotopic) + "]: ");
-        Serial.println(msg);
-        mqtt_client.publish(infotopic, msg);
+        update_turnOn();
+        
+        handle_relay();
+
+        publish_currentlyOn();
     }
 }
