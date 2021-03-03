@@ -31,3 +31,11 @@ Le unità mobili all'avvio si connettono alla rete WiFi e richiedono di impostar
 Una volta impostato l'ID, l'unità entrerà nella normale modalità di funzionamento.
 
 Il fatto che le unità siano più di una e il circuito del riscaldamento sia unico implica che è sufficiente che una stanza sia sotto la temperatura target per attivare tutti i caloriferi. Questo può essere mitigato mediante l'utilizzo di valvole termostatiche.
+
+## Features principali
+- Aumento/diminuzione temperatura target
+- Accensione/spegnimento termostato (continua a mostrare la temperatura)
+- Riconnessione automatica alla rete WiFi e al server MQTT
+- Se l'unità fissa non riceve alcuna comunicazione da un'unità mobile per più di 5 minuti la "dimentica"
+- Le unità mobili pubblicano info MQTT su temperatura e umidità misurate e target
+- Le unità mobili permettono di impostare l'ID contestualmente all'accensione
