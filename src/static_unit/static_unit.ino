@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <TaskScheduler.h>
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
@@ -12,7 +13,6 @@ const char *infotopic = "PortableThermostat/info/static/currentlyOn";
 
 WiFiClient espClient;
 PubSubClient mqtt_client(espClient);
-unsigned long lastCheck = 0;
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
 
@@ -27,6 +27,8 @@ short currentlyOn = -1;
 short mobiles[NUMBER_OF_MOBILES]; //Memorizza lo stato dei termostati: -1 se unknown, 0 se non richiedono riscaldamento, 1 se lo richiedono
 unsigned long last_updates[NUMBER_OF_MOBILES]; //Usato per "invecchiamento" degli stati dei termostati. Se un termostato non comunica per più di un certo numero di ms si resetta il suo stato a unknown
 #define AGING_THRESHOLD 300000
+
+Scheduler ts;
 
 void setup_wifi() {
     digitalWrite(BUILTIN_LED, LOW);
@@ -81,7 +83,7 @@ void mqtt_subscribe_to_mobiles(){
     mqtt_client.subscribe(topic_buffer);
 }
 
-bool mqtt_reconnect() {
+void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, LOW);
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
@@ -97,8 +99,8 @@ bool mqtt_reconnect() {
         Serial.print("failed, rc=");
         Serial.println(mqtt_client.state());
     }
-    return mqtt_client.connected();
 }
+Task mqtt_reconnect_task(RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
 
 //Inizializza l'array dei mobiles a -1
 void init_mobile_arr(short mobilearr[], int mobilecount){
@@ -116,6 +118,7 @@ void check_mobiles_aging(){
         }
     }
 }
+Task check_mobiles_aging_task(TASK_SECOND, TASK_FOREVER, check_mobiles_aging);
 
 void update_turnOn(){
     turnOn = false;
@@ -126,6 +129,7 @@ void update_turnOn(){
         }
     }
 }
+Task update_turnOn_task(TASK_IMMEDIATE, TASK_FOREVER, update_turnOn);
 
 void handle_relay(){
     if(turnOn == true){
@@ -136,6 +140,7 @@ void handle_relay(){
         currentlyOn = 0;
     }
 }
+Task handle_relay_task(TASK_IMMEDIATE, TASK_FOREVER, handle_relay);
 
 void publish_currentlyOn(){
     itoa(currentlyOn, msg, 10);
@@ -143,6 +148,7 @@ void publish_currentlyOn(){
     Serial.println(msg);
     mqtt_client.publish(infotopic, msg);
 }
+Task publish_currentlyOn_task(10 * TASK_SECOND, TASK_FOREVER, publish_currentlyOn);
 
 
 void setup() {
@@ -156,28 +162,27 @@ void setup() {
     mqtt_client.setServer(mqtt_server, 1883);
     mqtt_client.setCallback(mqtt_callback);
     init_mobile_arr(mobiles, NUMBER_OF_MOBILES);
+
+    ts.addTask(mqtt_reconnect_task);
+    ts.addTask(check_mobiles_aging_task);
+    ts.addTask(update_turnOn_task);
+    ts.addTask(handle_relay_task);
+    ts.addTask(publish_currentlyOn_task);
+    check_mobiles_aging_task.enable();
+    update_turnOn_task.enable();
+    handle_relay_task.enable();
 }
 
 void loop() {
     unsigned long now = millis();
     if (!mqtt_client.connected()) {
-        if(now - last_reconnect_attempt > RECONNECT_DELAY){
-            last_reconnect_attempt = now;
-            //Attempt to reconnect
-            mqtt_reconnect();
-        }
+        mqtt_reconnect_task.enableIfNot();
+        publish_currentlyOn_task.disable();
+    } else {
+        mqtt_reconnect_task.disable();
+        publish_currentlyOn_task.enableIfNot();
     }
     mqtt_client.loop();
 
-    if(now - lastCheck > 2000){
-        lastCheck=now;
-        
-        check_mobiles_aging();
-        
-        update_turnOn();
-        
-        handle_relay();
-
-        publish_currentlyOn();
-    }
+    ts.execute();
 }
