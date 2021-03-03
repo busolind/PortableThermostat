@@ -38,6 +38,7 @@ SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLE
 #define TRGT_POS 64,0
 #define ONOFF_POS 64,15
 #define ENABLED_POS 96,15
+#define ID_POS 128, 15  //Il numero rimane sulla sinistra del punto indicato
 
 #define DHTPIN D4
 #define DHTTYPE DHT11
@@ -293,6 +294,10 @@ void draw_display(){
     if(enableThermostat){
         display.drawString(ENABLED_POS, "EN");
     }
+
+    display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    display.drawString(ID_POS, String(thermostat_id));
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
     
     display.display();
 }
