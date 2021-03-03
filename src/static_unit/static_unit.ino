@@ -19,8 +19,6 @@ char msg[MSG_BUFFER_SIZE];
 #define TOPIC_BUFFER_SIZE (150)
 char topic_buffer[TOPIC_BUFFER_SIZE];
 
-int value = 0;
-
 short currentlyOn = -1;
 
 #define RELAY_PIN D5
@@ -66,7 +64,7 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     digitalWrite(BUILTIN_LED, LOW);
     int index = atoi((char*)&topic[(strlen(cmdtopic) + 1)]); //Estrae il numero del termostato mobile dal percorso del topic
 
-    if(index < NUMBER_OF_MOBILES){ //Non dovrebbe essere necessario perché non sottoscrive nessun topic diverso da quelli con numeri compatibili
+    if(index < NUMBER_OF_MOBILES){
         mobiles[index] = (payload[0] - '0');
         last_updates[index] = millis();
     }
@@ -74,15 +72,12 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length) {
     digitalWrite(BUILTIN_LED, HIGH);
 }
 
-//Sottoscrive iterativamente ai topic relativi a ciascun termostato mobile
 void mqtt_subscribe_to_mobiles(){
-    for(int i=0; i<NUMBER_OF_MOBILES; i++){
-        snprintf(topic_buffer, TOPIC_BUFFER_SIZE, "%s/%d/turnOn", cmdtopic, i);
-        Serial.print("Subscribed to topic [");
-        Serial.print(topic_buffer);
-        Serial.println("]");
-        mqtt_client.subscribe(topic_buffer);
-    }
+    snprintf(topic_buffer, TOPIC_BUFFER_SIZE, "%s/+/turnOn", cmdtopic);
+    Serial.print("Subscribed to topic [");
+    Serial.print(topic_buffer);
+    Serial.println("]");
+    mqtt_client.subscribe(topic_buffer);
 }
 
 bool mqtt_reconnect() {
