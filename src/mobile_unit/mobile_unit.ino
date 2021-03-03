@@ -298,6 +298,20 @@ void draw_display(){
 }
 Task draw_display_task(TASK_IMMEDIATE, TASK_FOREVER, draw_display);
 
+void update_turnOn(){
+    //Se termostato è abilitato, verifica che ci sia bisogno di accendere (con isteresi)
+    if(enableThermostat) {
+        if(turnOn == 0 && current_temp <= (target_temp - HYSTERESIS)){
+            turnOn = 1;
+        } else if(turnOn == 1 && current_temp >= (target_temp + HYSTERESIS)) {
+            turnOn = 0;
+        }
+    } else {
+        turnOn = 0;
+    }
+}
+Task update_turnOn_task(TASK_IMMEDIATE, TASK_FOREVER, update_turnOn);
+
 void setup() {
     Serial.begin(115200);
     pinMode(BUILTIN_LED, OUTPUT);
@@ -321,17 +335,18 @@ void setup() {
 
     ts.addTask(mqtt_reconnect_task);
     ts.addTask(handle_buttons_task);
-    handle_buttons_task.enable();
     ts.addTask(get_sensor_data_task);
-    get_sensor_data_task.enable();
     ts.addTask(publish_turnOn_task);
     ts.addTask(publish_infos_task);
     ts.addTask(draw_display_task);
+    ts.addTask(update_turnOn_task);
+    handle_buttons_task.enable();
+    get_sensor_data_task.enable();
+    update_turnOn_task.enable();
     draw_display_task.enable();
 }
 
 void loop() {
-    unsigned long now = millis();
     if (!mqtt_client.connected()) {
         mqtt_reconnect_task.enableIfNot();
         publish_turnOn_task.disable();
@@ -342,18 +357,6 @@ void loop() {
         publish_infos_task.enableIfNot();
     }
     mqtt_client.loop();
-
-    //TODO: PID
-
-    //Se termostato è abilitato, verifica che ci sia bisogno di accendere (con isteresi)
-    if(enableThermostat) {
-        if(turnOn == 0 && current_temp <= (target_temp - HYSTERESIS)){
-            turnOn = 1;
-        } else if(turnOn == 1 && current_temp >= (target_temp + HYSTERESIS)) {
-            turnOn = 0;
-        }
-    } else {
-        turnOn = 0;
-    }
+    
     ts.execute();
 }
