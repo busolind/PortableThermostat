@@ -10,6 +10,15 @@ Le camere da letto si trovano al lato opposto dell'appartamento e sono ormai le 
 Il sistema è composto da un'unica unità fissa, il cui compito è quello di agire sui controlli fisici della pompa del circuito caloriferi tramite un relé, e una o più unità mobili, che svolgono l'effettiva funzione di termostato e possono essere piazzate nei luoghi in cui è effettivamente utile misurare la temperatura.\
 Ciascuna unità mobile ha un ID settato all'avvio e tre pulsanti: aumento/diminuzione della temperatura e on/off.
 
+### Immagine unità mobile
+<p align="center"><img src="img/mobile_completo_orizz.jpg"></p>
+Da sinistra a destra:
+
+ - Bottoni on/off, + e -
+ - Display
+ - Termometro
+ - Wemos D1 mini
+
 ## Componentistica
 Per l'unità fissa si ha:
 
@@ -31,6 +40,15 @@ Le unità mobili all'avvio si connettono alla rete WiFi e richiedono di impostar
 Una volta impostato l'ID, l'unità entrerà nella normale modalità di funzionamento.
 
 Il fatto che le unità siano più di una e il circuito del riscaldamento sia unico implica che è sufficiente che una stanza sia sotto la temperatura target per attivare tutti i caloriferi. Questo può essere mitigato mediante l'utilizzo di valvole termostatiche.
+
+### Interfaccia su display delle unità mobili
+<p align="center"><img src="img/display_on.jpg" width=450px></p>
+
+A sinistra si trova la temperatura misurata attualmente, al centro la fiammella indica che è richiesto il riscaldamento e in alto a destra si può vedere il target di temperatura.\
+Subito sotto, la scritta "EN" indica che il termostato è abilitato e il numero in basso a destra ne riporta l'identificatore.\
+Esempio di termostato disabilitato:
+
+<p align="center"><img src="img/display_off.jpg" width=450px></p>
 
 ## Features principali
 - Aumento/diminuzione temperatura target
