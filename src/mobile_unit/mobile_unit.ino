@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <PubSubClientTools.h>
 
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
@@ -13,10 +14,8 @@ const char *password = "IOT_TEST";
 const char *mqtt_server = "192.168.178.10";
 
 WiFiClient espClient;
-PubSubClient mqtt_client(espClient);
-#define MSG_BUFFER_SIZE (50)
-char msg[MSG_BUFFER_SIZE];
-unsigned long last_info = 0;
+PubSubClient mqtt_client(mqtt_server, 1883, espClient);
+PubSubClientTools mqtt_tools(mqtt_client);
 
 Scheduler ts;
 
@@ -27,9 +26,6 @@ unsigned long last_reconnect_attempt = 0;
 #define RECONNECT_DELAY 5000
 String cmdtopic_base = "PortableThermostat/cmd/mobile";
 String infotopic_base = "PortableThermostat/info/mobile";
-const char *turnOn_topic;
-String turnOn_string;
-String info_string;
 
 #define SDA D2
 #define SCL D1
@@ -56,8 +52,6 @@ float target_temp=20;
 float current_temp = -1;
 float current_humidity = -1;
 int turnOn;
-int last_turnOn = 0;
-unsigned long last_measurement = 0;
 bool enableThermostat = true;
 
 typedef struct {
@@ -198,22 +192,10 @@ void setup_wifi() {
     Serial.println(WiFi.localIP());
 }
 
-void mqtt_callback(char *topic, byte *payload, unsigned int length) {
-    Serial.print("Message arrived [");
-    Serial.print(topic);
-    Serial.print("] ");
-    for (int i = 0; i < length; i++) {
-        Serial.print((char)payload[i]);
-    }
-    Serial.println();
-}
-
 void mqtt_reconnect() {
     digitalWrite(BUILTIN_LED, LOW);
     Serial.print("Attempting MQTT connection...");
-    // Create a random client ID
-    String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
+    String clientId = "ESP8266Client-PT-mobile-" + String(thermostat_id);
     // Attempt to connect
     if (mqtt_client.connect(clientId.c_str())) {
         Serial.println("connected");
@@ -226,35 +208,32 @@ void mqtt_reconnect() {
 Task mqtt_reconnect_task(RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
 
 void publish_turnOn(){
-    char cmd[5];
-    itoa(turnOn, cmd, 10);
-    Serial.print("Publish message [" + String(turnOn_topic) + "]: ");
-    Serial.println(cmd);
-    mqtt_client.publish(turnOn_topic, cmd);
+    String topic = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
+    String cmd = String(turnOn);
+    Serial.println("Publish message [" + topic + "]: " + cmd);
+    mqtt_tools.publish(topic, cmd);
 }
 Task publish_turnOn_task(5 * TASK_SECOND, TASK_FOREVER, publish_turnOn);
 
 void publish_infos(){
+    String topic, msg;
     //pubblica temp
-    info_string = infotopic_base + "/" + String(thermostat_id) + "/temp";
-    snprintf(msg, MSG_BUFFER_SIZE, "%.2f", current_temp);
-    Serial.print("Publish message [" + info_string + "]: ");
-    Serial.println(msg);
-    mqtt_client.publish(info_string.c_str(), msg);
+    topic = infotopic_base + "/" + String(thermostat_id) + "/temp";
+    msg = String(current_temp, 2);
+    Serial.println("Publish message [" + topic + "]: " + msg);
+    mqtt_tools.publish(topic, msg);
 
     //pubblica humid
-    info_string = infotopic_base + "/" + String(thermostat_id) + "/humid";
-    snprintf(msg, MSG_BUFFER_SIZE, "%.2f", current_humidity);
-    Serial.print("Publish message [" + info_string + "]: ");
-    Serial.println(msg);
-    mqtt_client.publish(info_string.c_str(), msg);
+    topic = infotopic_base + "/" + String(thermostat_id) + "/humid";
+    msg = String(current_humidity, 2);
+    Serial.println("Publish message [" + topic + "]: " + msg);
+    mqtt_tools.publish(topic, msg);
 
     //pubblica target
-    info_string = infotopic_base + "/" + String(thermostat_id) + "/target";
-    snprintf(msg, MSG_BUFFER_SIZE, "%.2f", target_temp);
-    Serial.print("Publish message [" + info_string + "]: ");
-    Serial.println(msg);
-    mqtt_client.publish(info_string.c_str(), msg);
+    topic = infotopic_base + "/" + String(thermostat_id) + "/target_temp";
+    msg = String(target_temp, 2);
+    Serial.println("Publish message [" + topic + "]: " + msg);
+    mqtt_tools.publish(topic, msg);
 }
 Task publish_infos_task(10 * TASK_SECOND, TASK_FOREVER, publish_infos);
 
@@ -326,17 +305,12 @@ void setup() {
     
     setup_wifi();
     setup_buttons();
-    mqtt_client.setServer(mqtt_server, 1883);
-    mqtt_client.setCallback(mqtt_callback);
 
     dht.begin();
   
     display.init();
 
     setup_id();
-    
-    turnOn_string = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
-    turnOn_topic = turnOn_string.c_str();
 
     ts.addTask(mqtt_reconnect_task);
     ts.addTask(handle_buttons_task);
