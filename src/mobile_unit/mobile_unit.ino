@@ -8,6 +8,7 @@
 
 #include <SSD1306Wire.h>
 #include <TaskScheduler.h>
+#include <InputDebounce.h>
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
@@ -53,18 +54,11 @@ float current_temp = -1;
 float current_humidity = -1;
 int turnOn;
 bool enableThermostat = true;
+bool setup_id_mode;
 
-typedef struct {
-    int number;
-    int current_state;
-    int last_state;
-    unsigned long last_debounce;
-} button_pin;
-
-button_pin plusbtn;
-button_pin minusbtn;
-button_pin enablebtn;
-button_pin *buttons[NUM_BUTTONS];
+InputDebounce plusbtn;
+InputDebounce minusbtn;
+InputDebounce enablebtn;
 
 #define FLAME_WIDTH 16
 #define FLAME_HEIGHT 16
@@ -74,98 +68,79 @@ const uint8_t FlameLogo_bits[] PROGMEM = {
     0x3C, 0x1F, 0x38, 0x1E, 0x38, 0x0C, 0x30, 0x0C,
 };
 
+void button_pressed_callback(uint8_t pin){
+    switch(pin){
+        case PLUSBTTN:
+            target_temp+=0.1;
+            break;
+        case MINUSBTTN:
+            target_temp-=0.1;
+            break;
+        case ENABLEBTTN:
+            enableThermostat = !enableThermostat;
+            break;
+    }
+}
+
+void setup_id_button_pressed_callback(uint8_t pin){
+    switch(pin){
+        case PLUSBTTN:
+            thermostat_id+=1;
+            break;
+        case MINUSBTTN:
+            thermostat_id-=1;
+            break;
+        case ENABLEBTTN:
+            setup_id_mode = false;
+            break;
+    }
+    if(thermostat_id < 0){
+        thermostat_id += MAX_NUMBER_OF_MOBILES;
+    } else {
+        thermostat_id = thermostat_id % MAX_NUMBER_OF_MOBILES;
+    }
+}
 
 void setup_buttons(){
+    plusbtn.setup(PLUSBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
+    minusbtn.setup(MINUSBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
+    enablebtn.setup(ENABLEBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
+}
+
+
+void register_button_callbacks(){
+    plusbtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
+    minusbtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
+    enablebtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
+}
+
+
+void process_buttons(){
     unsigned long now = millis();
-    
-    pinMode(PLUSBTTN, INPUT);
-    plusbtn.number=PLUSBTTN;
-    plusbtn.last_state = 0;
-    plusbtn.last_debounce = now;
-    buttons[0]=&plusbtn;
-
-    pinMode(MINUSBTTN, INPUT);
-    minusbtn.number=MINUSBTTN;
-    minusbtn.last_state = 0;
-    minusbtn.last_debounce = now;
-    buttons[1]=&minusbtn;
-
-    pinMode(ENABLEBTTN, INPUT);
-    enablebtn.number=ENABLEBTTN;
-    enablebtn.last_state = 0;
-    enablebtn.last_debounce = now;
-    buttons[2]=&enablebtn;
-    
-    
+    plusbtn.process(now);
+    minusbtn.process(now);
+    enablebtn.process(now);
 }
-
-void read_buttons(){
-    for(int i=0; i<NUM_BUTTONS; i++){
-        buttons[i] -> current_state = digitalRead(buttons[i]->number);
-    }
-}
-
-void debounce_buttons(){
-    //aggiorna i last debounce
-    unsigned long now = millis();
-    for(int i=0; i<NUM_BUTTONS; i++){
-        if(buttons[i] -> current_state != buttons[i] -> last_state){
-            buttons[i] -> last_debounce = now;
-        }
-    }
-}
-
-void update_last_buttons_state(){
-    //aggiorna i last state
-    for(int i=0; i<NUM_BUTTONS; i++){
-      buttons[i]-> last_state = buttons[i]-> current_state;
-    }
-}
-
-void handle_buttons(){
-    read_buttons();
-
-    unsigned long now = millis();
-    //controlla gli stati
-    if((plusbtn.current_state == HIGH) && (plusbtn.current_state != plusbtn.last_state) && (now - plusbtn.last_debounce > DEBOUNCE_DELAY)){
-        target_temp+=0.1;
-    } else if((minusbtn.current_state == HIGH) && (minusbtn.current_state != minusbtn.last_state) && (now - minusbtn.last_debounce > DEBOUNCE_DELAY)){
-        target_temp-=0.1;
-    } else if((enablebtn.current_state == HIGH) && (enablebtn.current_state != enablebtn.last_state) && (now - enablebtn.last_debounce > DEBOUNCE_DELAY)){
-        enableThermostat = !enableThermostat;
-    }
-
-    debounce_buttons();
-    update_last_buttons_state();
-    
-}
-Task handle_buttons_task(TASK_IMMEDIATE, TASK_FOREVER, handle_buttons);
+Task process_buttons_task(TASK_IMMEDIATE, TASK_FOREVER, process_buttons);
 
 void setup_id(){
-    bool done = false;
+    setup_id_mode = true;
+    plusbtn.registerCallbacks(setup_id_button_pressed_callback, NULL, NULL, NULL);
+    minusbtn.registerCallbacks(setup_id_button_pressed_callback, NULL, NULL, NULL);
+    enablebtn.registerCallbacks(setup_id_button_pressed_callback, NULL, NULL, NULL);
     do{
-        int id=0;
         display.clear();
         display.setFont(ArialMT_Plain_16);
         display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
-        read_buttons();
         unsigned long now = millis();
-        if((plusbtn.current_state == HIGH) && (plusbtn.current_state != plusbtn.last_state) && (now - plusbtn.last_debounce > DEBOUNCE_DELAY)){
-            thermostat_id++;
-        } else if((minusbtn.current_state == HIGH) && (minusbtn.current_state != minusbtn.last_state) && (now - minusbtn.last_debounce > DEBOUNCE_DELAY)){
-            thermostat_id--;
-        } else if((enablebtn.current_state == HIGH) && (enablebtn.current_state != enablebtn.last_state) && (now - enablebtn.last_debounce > DEBOUNCE_DELAY)){
-            done=true;
-        }
-        if(thermostat_id < 0){
-            thermostat_id += MAX_NUMBER_OF_MOBILES;
-        }
-        thermostat_id = thermostat_id % MAX_NUMBER_OF_MOBILES;
+
+        plusbtn.process(now);
+        minusbtn.process(now);
+        enablebtn.process(now);
+        
         display.drawString(64, 14, "Scegli id: " + String(thermostat_id));
-        debounce_buttons();
-        update_last_buttons_state();
         display.display();
-    } while(!done);
+    } while(setup_id_mode);
 }
 
 void setup_wifi() {
@@ -311,15 +286,16 @@ void setup() {
     display.init();
 
     setup_id();
+    register_button_callbacks();
 
     ts.addTask(mqtt_reconnect_task);
-    ts.addTask(handle_buttons_task);
+    ts.addTask(process_buttons_task);
     ts.addTask(get_sensor_data_task);
     ts.addTask(publish_turnOn_task);
     ts.addTask(publish_infos_task);
     ts.addTask(draw_display_task);
     ts.addTask(update_turnOn_task);
-    handle_buttons_task.enable();
+    process_buttons_task.enable();
     get_sensor_data_task.enable();
     update_turnOn_task.enable();
     draw_display_task.enable();
