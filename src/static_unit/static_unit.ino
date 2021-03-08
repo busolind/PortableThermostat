@@ -7,24 +7,23 @@ const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
 const char *mqtt_server = "192.168.178.10";
 
-#define RECONNECT_DELAY 5000
-String cmdtopic_mobile_base = "PortableThermostat/cmd/mobile";
-String infotopic = "PortableThermostat/info/static/currentlyOn";
+#define MQTT_RECONNECT_DELAY 5000
+#define RELAY_PIN D5
+#define NUMBER_OF_MOBILES (5)
+#define AGING_THRESHOLD 300000
 
 WiFiClient espClient;
 PubSubClient mqtt_client(mqtt_server, 1883, espClient);
 PubSubClientTools mqtt_tools(mqtt_client);
+String cmdtopic_mobile_base = "PortableThermostat/cmd/mobile";
+String infotopic = "PortableThermostat/info/static/currentlyOn";
+
+Scheduler ts;
 
 bool turnOn = false;
 short currentlyOn = -1;
-
-#define RELAY_PIN D5
-#define NUMBER_OF_MOBILES (5)
 int mobiles[NUMBER_OF_MOBILES]; //Memorizza lo stato dei termostati: -1 se unknown, 0 se non richiedono riscaldamento, 1 se lo richiedono
 unsigned long last_updates[NUMBER_OF_MOBILES]; //Usato per "invecchiamento" degli stati dei termostati. Se un termostato non comunica per più di un certo numero di ms si resetta il suo stato a unknown
-#define AGING_THRESHOLD 300000
-
-Scheduler ts;
 
 void setup_wifi() {
     digitalWrite(BUILTIN_LED, LOW);
@@ -83,7 +82,7 @@ void mqtt_reconnect() {
         Serial.println(mqtt_client.state());
     }
 }
-Task mqtt_reconnect_task(RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
+Task mqtt_reconnect_task(MQTT_RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
 
 //Inizializza l'array dei mobiles a -1
 void init_mobile_arr(int mobilearr[], int mobilecount){

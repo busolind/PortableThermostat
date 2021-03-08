@@ -10,55 +10,60 @@
 #include <TaskScheduler.h>
 #include <InputDebounce.h>
 
+
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
 const char *mqtt_server = "192.168.178.10";
 
-WiFiClient espClient;
-PubSubClient mqtt_client(mqtt_server, 1883, espClient);
-PubSubClientTools mqtt_tools(mqtt_client);
-
-Scheduler ts;
-
 #define MAX_NUMBER_OF_MOBILES (5)
-int thermostat_id = 0;
+#define MQTT_RECONNECT_DELAY 5000
 
-unsigned long last_reconnect_attempt = 0;
-#define RECONNECT_DELAY 5000
-String cmdtopic_base = "PortableThermostat/cmd/mobile";
-String infotopic_base = "PortableThermostat/info/mobile";
-
+//DISPLAY
 #define SDA D2
 #define SCL D1
-SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLEDDISPLAY_GEOMETRY  -  Extra param required for 128x32 displays.
 #define TEMP_POS 0,2
 #define TRGT_POS 80,0
 #define FLAME_POS 60,8
 #define ENABLED_POS 96,15
 #define ID_POS 128, 15  //Il numero rimane sulla sinistra del punto indicato
 
+//DHT
 #define DHTPIN D4
 #define DHTTYPE DHT11
-DHT_Unified dht(DHTPIN, DHTTYPE);
 #define SENSOR_DELAY 1000
 
+//BOTTONI
 #define ENABLEBTTN D8
 #define PLUSBTTN D7
 #define MINUSBTTN D6
 #define NUM_BUTTONS 3
-#define DEBOUNCE_DELAY 50
 
 #define HYSTERESIS 0.3
-float target_temp=20;
-float current_temp = -1;
-float current_humidity = -1;
-int turnOn;
-bool enableThermostat = true;
-bool setup_id_mode;
+
+WiFiClient espClient;
+PubSubClient mqtt_client(mqtt_server, 1883, espClient);
+PubSubClientTools mqtt_tools(mqtt_client);
+String cmdtopic_base = "PortableThermostat/cmd/mobile";
+String infotopic_base = "PortableThermostat/info/mobile";
+
+Scheduler ts;
+
+SSD1306Wire display(0x3c, SDA, SCL, GEOMETRY_128_32);  // ADDRESS, SDA, SCL, OLEDDISPLAY_GEOMETRY  -  Extra param required for 128x32 displays.
+
+DHT_Unified dht(DHTPIN, DHTTYPE);
 
 InputDebounce plusbtn;
 InputDebounce minusbtn;
 InputDebounce enablebtn;
+
+bool setup_id_mode;
+int thermostat_id = 0;
+float target_temp = 20;
+float current_temp = -1;
+float current_humidity = -1;
+bool enableThermostat = true;
+int turnOn;
+
 
 #define FLAME_WIDTH 16
 #define FLAME_HEIGHT 16
@@ -67,6 +72,36 @@ const uint8_t FlameLogo_bits[] PROGMEM = {
     0xF8, 0x07, 0xF8, 0x0F, 0xF8, 0x0F, 0xFC, 0x0F, 0xBC, 0x1F, 0x3C, 0x1F, 
     0x3C, 0x1F, 0x38, 0x1E, 0x38, 0x0C, 0x30, 0x0C,
 };
+
+void setup_wifi() {
+
+    delay(10);
+    // We start by connecting to a WiFi network
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+
+    randomSeed(micros());
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+}
+
+void setup_buttons(){
+    plusbtn.setup(PLUSBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
+    minusbtn.setup(MINUSBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
+    enablebtn.setup(ENABLEBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
+}
 
 void button_pressed_callback(uint8_t pin){
     switch(pin){
@@ -101,28 +136,6 @@ void setup_id_button_pressed_callback(uint8_t pin){
     }
 }
 
-void setup_buttons(){
-    plusbtn.setup(PLUSBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
-    minusbtn.setup(MINUSBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
-    enablebtn.setup(ENABLEBTTN, DEFAULT_INPUT_DEBOUNCE_DELAY, InputDebounce::PIM_EXT_PULL_DOWN_RES);
-}
-
-
-void register_button_callbacks(){
-    plusbtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
-    minusbtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
-    enablebtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
-}
-
-
-void process_buttons(){
-    unsigned long now = millis();
-    plusbtn.process(now);
-    minusbtn.process(now);
-    enablebtn.process(now);
-}
-Task process_buttons_task(TASK_IMMEDIATE, TASK_FOREVER, process_buttons);
-
 void setup_id(){
     setup_id_mode = true;
     plusbtn.registerCallbacks(setup_id_button_pressed_callback, NULL, NULL, NULL);
@@ -143,28 +156,10 @@ void setup_id(){
     } while(setup_id_mode);
 }
 
-void setup_wifi() {
-
-    delay(10);
-    // We start by connecting to a WiFi network
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
-
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-
-    randomSeed(micros());
-
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+void register_button_callbacks(){
+    plusbtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
+    minusbtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
+    enablebtn.registerCallbacks(button_pressed_callback, NULL, NULL, NULL);
 }
 
 void mqtt_reconnect() {
@@ -180,37 +175,15 @@ void mqtt_reconnect() {
         Serial.println(mqtt_client.state());
     }
 }
-Task mqtt_reconnect_task(RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
+Task mqtt_reconnect_task(MQTT_RECONNECT_DELAY * TASK_MILLISECOND, TASK_FOREVER, mqtt_reconnect);
 
-void publish_turnOn(){
-    String topic = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
-    String cmd = String(turnOn);
-    Serial.println("Publish message [" + topic + "]: " + cmd);
-    mqtt_tools.publish(topic, cmd);
+void process_buttons(){
+    unsigned long now = millis();
+    plusbtn.process(now);
+    minusbtn.process(now);
+    enablebtn.process(now);
 }
-Task publish_turnOn_task(5 * TASK_SECOND, TASK_FOREVER, publish_turnOn);
-
-void publish_infos(){
-    String topic, msg;
-    //pubblica temp
-    topic = infotopic_base + "/" + String(thermostat_id) + "/temp";
-    msg = String(current_temp, 2);
-    Serial.println("Publish message [" + topic + "]: " + msg);
-    mqtt_tools.publish(topic, msg);
-
-    //pubblica humid
-    topic = infotopic_base + "/" + String(thermostat_id) + "/humid";
-    msg = String(current_humidity, 2);
-    Serial.println("Publish message [" + topic + "]: " + msg);
-    mqtt_tools.publish(topic, msg);
-
-    //pubblica target
-    topic = infotopic_base + "/" + String(thermostat_id) + "/target_temp";
-    msg = String(target_temp, 2);
-    Serial.println("Publish message [" + topic + "]: " + msg);
-    mqtt_tools.publish(topic, msg);
-}
-Task publish_infos_task(10 * TASK_SECOND, TASK_FOREVER, publish_infos);
+Task process_buttons_task(TASK_IMMEDIATE, TASK_FOREVER, process_buttons);
 
 void get_sensor_data(){
     sensors_event_t event;
@@ -270,6 +243,37 @@ void update_turnOn(){
     }
 }
 Task update_turnOn_task(TASK_IMMEDIATE, TASK_FOREVER, update_turnOn);
+
+void publish_turnOn(){
+    String topic = cmdtopic_base + "/" + String(thermostat_id) + "/turnOn";
+    String cmd = String(turnOn);
+    Serial.println("Publish message [" + topic + "]: " + cmd);
+    mqtt_tools.publish(topic, cmd);
+}
+Task publish_turnOn_task(5 * TASK_SECOND, TASK_FOREVER, publish_turnOn);
+
+void publish_infos(){
+    String topic, msg;
+    //pubblica temp
+    topic = infotopic_base + "/" + String(thermostat_id) + "/temp";
+    msg = String(current_temp, 2);
+    Serial.println("Publish message [" + topic + "]: " + msg);
+    mqtt_tools.publish(topic, msg);
+
+    //pubblica humid
+    topic = infotopic_base + "/" + String(thermostat_id) + "/humid";
+    msg = String(current_humidity, 2);
+    Serial.println("Publish message [" + topic + "]: " + msg);
+    mqtt_tools.publish(topic, msg);
+
+    //pubblica target
+    topic = infotopic_base + "/" + String(thermostat_id) + "/target_temp";
+    msg = String(target_temp, 2);
+    Serial.println("Publish message [" + topic + "]: " + msg);
+    mqtt_tools.publish(topic, msg);
+}
+Task publish_infos_task(10 * TASK_SECOND, TASK_FOREVER, publish_infos);
+
 
 void setup() {
     Serial.begin(115200);
