@@ -5,7 +5,7 @@
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
-const char *mqtt_server = "192.168.178.10";
+const char *mqtt_server = "192.168.178.5";
 
 #define MQTT_RECONNECT_DELAY 5000
 #define RELAY_PIN D5

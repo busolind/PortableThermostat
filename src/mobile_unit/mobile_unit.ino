@@ -13,7 +13,7 @@
 
 const char *ssid = "IOT_TEST";
 const char *password = "IOT_TEST";
-const char *mqtt_server = "192.168.178.10";
+const char *mqtt_server = "192.168.178.5";
 
 #define MAX_NUMBER_OF_MOBILES (5)
 #define MQTT_RECONNECT_DELAY 5000
@@ -28,7 +28,7 @@ const char *mqtt_server = "192.168.178.10";
 #define ID_POS 128, 15  //Il numero rimane sulla sinistra del punto indicato
 
 //DHT
-#define DHTPIN D4
+#define DHTPIN D3
 #define DHTTYPE DHT11
 #define SENSOR_DELAY 1000
 
@@ -278,9 +278,7 @@ Task publish_infos_task(10 * TASK_SECOND, TASK_FOREVER, publish_infos);
 void setup() {
     Serial.begin(115200);
     pinMode(BUILTIN_LED, OUTPUT);
-    pinMode(SDA, OUTPUT);
-    pinMode(SCL, OUTPUT);
-    pinMode(DHTPIN, OUTPUT);
+    digitalWrite(BUILTIN_LED, HIGH);
     
     setup_wifi();
     setup_buttons();
